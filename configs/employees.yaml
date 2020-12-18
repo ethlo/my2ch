@@ -1,0 +1,21 @@
+mysql:
+  user: root
+  pass: qwerty123
+  db: employees
+  host: 192.168.50.112
+
+clickhouse:
+  url: clickhouse://192.168.50.112
+  db: default
+  table_name: employees
+  engine_definition: ENGINE = MergeTree
+    ORDER BY from_date
+    SETTINGS index_granularity = 8192;
+
+transfer:
+  primary_key: from_date
+  range_clause: and from_date > '{max_primary_key}'
+  query: select e.emp_no, birth_date, s.from_date, s.to_date, s.salary
+    from salaries s
+    left join employees e on s.emp_no = e.emp_no
+    where birth_date > '1965-01-01'
