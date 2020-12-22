@@ -95,10 +95,10 @@ Processing data set 'employees'
 Connected to MySQL host 192.168.50.112
 Transferred 0 rows in 0.104 seconds
 === Status ===
-Total rows: 17,731
-Last modified: 40 seconds ago (2020-12-22 10:04:23Z)
-Disk usage: 151.2 kB
-Compression ratio: 2.59X
+Total rows: 2,861,778
+Last modified: 12 seconds ago (2020-12-22 10:44:03Z)
+Disk usage: 12.1 MB
+Compression ratio: 5.24X
 Storage engine: MergeTree
 ```
 
