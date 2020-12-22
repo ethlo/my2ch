@@ -18,4 +18,3 @@ transfer:
   query: select e.emp_no, birth_date, s.from_date, s.to_date, s.salary
     from salaries s
     left join employees e on s.emp_no = e.emp_no
-    where birth_date > '1965-01-01'

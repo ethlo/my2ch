@@ -60,7 +60,6 @@ transfer:
   query: select e.emp_no, birth_date, s.from_date, s.to_date, s.salary
     from salaries s
     left join employees e on s.emp_no = e.emp_no
-    where birth_date > '1965-01-01'
 ```
 
 #### Transfer data
@@ -73,14 +72,21 @@ You should see something like the following:
 ```shell
 Processing data set 'employees'
 Connected to MySQL host 192.168.50.112
-17,731 processed
-Transferred 17,731 rows in 0.131 seconds
+65,536 processed
+131,072 processed
+196,608 processed
+...
+2,686,976 processed
+2,752,512 processed
+2,844,047 processed
+Transferred 2,844,047 rows in 5.847 seconds
 === Status ===
-Total rows: 17,731
-Last modified: a moment ago (2020-12-22 10:04:23Z)
-Disk usage: 151.2 kB
-Compression ratio: 2.59X
+Total rows: 2,861,778
+Last modified: a moment ago (2020-12-22 10:44:03Z)
+Disk usage: 12.1 MB
+Compression ratio: 5.24X
 Storage engine: MergeTree
+
 ```
 
 Running the same command again should not transfer any data (as there is now new data). This is controlled by the `from_date` in the query:
@@ -110,17 +116,17 @@ LIMIT 10
 
 ```
 ┌─year─┬─max_salary─┐
-│ 2001 │     130760 │
-│ 2002 │     128403 │
-│ 2000 │     127203 │
-│ 1999 │     125542 │
-│ 1993 │     125031 │
-│ 1992 │     121590 │
-│ 1998 │     121065 │
-│ 1997 │     118777 │
-│ 1996 │     117388 │
-│ 1991 │     117257 │
+│ 2002 │     158220 │
+│ 2001 │     157821 │
+│ 2000 │     155377 │
+│ 1999 │     154885 │
+│ 1998 │     151484 │
+│ 1997 │     149675 │
+│ 1996 │     149208 │
+│ 1995 │     146531 │
+│ 1994 │     143182 │
+│ 1993 │     140625 │
 └──────┴────────────┘
 
-10 rows in set. Elapsed: 0.009 sec. Processed 17.73 thousand rows, 141.85 KB (2.05 million rows/s., 16.40 MB/s.) 
+10 rows in set. Elapsed: 0.017 sec. Processed 2.86 million rows, 22.89 MB (163.83 million rows/s., 1.31 GB/s.)  
 ```
