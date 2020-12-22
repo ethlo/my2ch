@@ -89,7 +89,7 @@ Storage engine: MergeTree
 
 ```
 
-Running the same command again should not transfer any data (as there is now new data). This is controlled by the `from_date` in the query:
+Running the same command again should not transfer any data (as there is no new data inserted in MySQL. This is controlled by the ` range_clause: and from_date > '{max_primary_key}'`).
 ```
 Processing data set 'employees'
 Connected to MySQL host 192.168.50.112
