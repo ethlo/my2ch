@@ -1,6 +1,8 @@
 #!/bin/bash
-mkdir -p tmp
-cd tmp || exit 1
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+mkdir -p "$DIR/tmp" && cd "$_"
 FILENAME="test_db.tar.gz"
 if [ ! -f "$FILENAME" ]; then
     echo "Downloading test data"
