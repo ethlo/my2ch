@@ -62,6 +62,9 @@ transfer:
     left join employees e on s.emp_no = e.emp_no
 ```
 
+For reference, the data model in MySQL has the following structure:
+![Schema](test/doc/schema.png)
+
 #### Transfer data
 Run the following command to transfer data:
 ```shell
