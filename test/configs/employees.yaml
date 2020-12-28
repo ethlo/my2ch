@@ -1,12 +1,12 @@
 mysql:
-  user: root
-  pass: example
+  user: ${MYSQL_USER}
+  pass: ${MYSQL_PASS}
   db: employees
-  host: mysql-server
+  host: ${MYSQL_SERVER}
 
 clickhouse:
-  url: clickhouse://clickhouse-server
-  db: default
+  url: $CLICKHOUSE_URL
+  db: $CLICKHOUSE_DB
   table_name: employees
   engine_definition: ENGINE = MergeTree
     ORDER BY from_date
