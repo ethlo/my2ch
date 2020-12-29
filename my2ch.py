@@ -104,7 +104,7 @@ def drop_view(mysql_conn, view_name):
 def ensure_view(mysql_conn, ch_table_name, query, range_clause):
     with mysql_conn.cursor() as cursor:
         view_name = f'tmp_my2ch_{ch_table_name}'
-        view_def = f'CREATE OR REPLACE VIEW `{view_name}` AS {query} {range_clause}'
+        view_def = f'CREATE OR REPLACE VIEW `{view_name}` AS {query}' + (' ' + range_clause if range_clause else '')
         logger.debug(f'Creating view {view_name}: {view_def}')
         cursor.execute(view_def)
         return view_name
@@ -171,10 +171,12 @@ def process_single(data_alias, def_file, use_temporary_view):
 
     # Create a table definition for Clickhouse based on the query's names and data-types
     query = settings['transfer']['query'].replace('$$', '$')
-    primary_key = settings['transfer']['primary_key']
+    primary_key = settings.get('transfer.primary_key', None)
     ch_target_db = settings['clickhouse']['db']
     data_alias = settings['clickhouse']['table_name']
     engine_def = settings['clickhouse']['engine_definition']
+    range_clause_tpl = settings.get('transfer.range_clause', None)
+    is_incremental = range_clause_tpl is not None
 
     # Ensure table exists
     clickhouse_url = settings['clickhouse']['url']
@@ -190,30 +192,30 @@ def process_single(data_alias, def_file, use_temporary_view):
         if format_ddl(existing_table_def) != format_ddl(table_def):
             logger.warning(f"Clickhouse definition for table '{data_alias}' "
                            f"seem to be out of date. Please drop the table and let it rebuild if possible.")
-    else:
-        ch_client.execute(table_def)
 
     # Create MySQL engine in clickhouse as proxy to mysql data
     logger.debug('Ensuring clickhouse connection to MySQL is set up')
-    create_mysql_engine = f"CREATE DATABASE IF NOT EXISTS mysql_{data_alias} ENGINE = MySQL('{mysql_host}', '{mysql_db}', '{mysql_user}', '{mysql_password}')"
+    create_mysql_engine = f"CREATE DATABASE IF NOT EXISTS mysql_{mysql_db} ENGINE = MySQL('{mysql_host}', '{mysql_db}', '{mysql_user}', '{mysql_password}')"
     logger.debug('Command to create MySQL DB proxy in Clickhouse: %s', create_mysql_engine)
     ch_client.execute(create_mysql_engine)
 
-    # Find current max
-    result = ch_client.execute(f"SELECT MAX({primary_key}) FROM {data_alias}")
-    max_primary_key = result[0][0]
-    logger.debug(f"Current max value of column '{primary_key}' in Clickhouse table '{data_alias}': {max_primary_key}")
-    range_clause_tpl = settings['transfer']['range_clause']
-    range_clause = range_clause_tpl.format(max_primary_key=max_primary_key) if range_clause_tpl is not None else ''
+    if is_incremental and table_exists:
+        # Find current max
+        result = ch_client.execute(f"SELECT MAX({primary_key}) FROM {data_alias}")
+        max_primary_key = result[0][0]
+        logger.debug(f"Current max value of column '{primary_key}' in Clickhouse table '{data_alias}': {max_primary_key}")
+
+        range_clause = range_clause_tpl.format(max_primary_key=max_primary_key) if range_clause_tpl is not None else ''
+        view_name = ensure_view(mysql_conn, data_alias, query, range_clause)
+    else:
+        ch_client.execute(f'drop table if exists {data_alias}')
+        logger.debug(f'Creating clickhouse table {data_alias}')
+        ch_client.execute(table_def)
+        view_name = ensure_view(mysql_conn, data_alias, query, None)
 
     # Insert data from above proxy into real clickhouse table
-    if use_temporary_view:
-        view_name = ensure_view(mysql_conn, data_alias, query, range_clause)
-        transfer_data(data_alias, ch_client, f"SELECT * FROM {view_name}", None, ch_target_db)
-        drop_view(mysql_conn, view_name)
-    else:
-        # Direct copy via ClickHouse -> MysSQL connector
-        transfer_data(data_alias, ch_client, query, range_clause, ch_target_db)
+    transfer_data(mysql_db, data_alias, ch_client, f"SELECT * FROM {view_name}", ch_target_db)
+    drop_view(mysql_conn, view_name)
 
     # Output clickhouse table stats
     storage_stats = fetch_storage_stats(ch_client, ch_target_db, data_alias)
@@ -233,18 +235,11 @@ def process_single(data_alias, def_file, use_temporary_view):
         logger.info('No existing data')
 
 
-def report_total(ch_table_name, ch_target_db, client):
-    result = client.execute(f'select count(*) from {ch_target_db}.{ch_table_name}')
-    total_rows = result[0][0]
-    logger.info(f"{total_rows:,} total rows in table")
-    return total_rows
-
-
-def transfer_data(ch_table_name, client, query, range_clause, ch_target_db):
+def transfer_data(mysql_db_name, ch_table_name, client, query, ch_target_db):
     started = time()
     logger.debug(f'Transferring data from MySQL query to Clickhouse table {ch_table_name}')
-    client.execute(f"use mysql_{ch_table_name}")
-    transfer_query = f"insert into {ch_target_db}.{ch_table_name} {query} {range_clause if range is not None else ''}"
+    client.execute(f"use mysql_{mysql_db_name}")
+    transfer_query = f'insert into {ch_target_db}.{ch_table_name} {query}'
     logger.debug("Transfer query: %s", transfer_query)
     progress = client.execute_with_progress(transfer_query)
     last = 0
@@ -264,7 +259,7 @@ def parse_config(path):
     return config
 
 
-def handler(sig, frame):
+def handler():
     global c
     print("\nExiting...")
     sys.exit(0)
