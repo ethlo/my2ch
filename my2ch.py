@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging as logger
 import os
 import signal
@@ -6,11 +7,11 @@ import sys
 from datetime import timedelta, datetime
 from time import time
 
+import hiyapyco
 import humanize
 import mysql.connector
 import sqlparse
 from clickhouse_driver import Client
-from envyaml import EnvYAML
 
 
 def convert_type(mysql_type):
@@ -112,7 +113,6 @@ def ensure_view(mysql_conn, ch_table_name, query, range_clause):
 
 def main(args):
     base_dir = args['home']
-    use_temporary_view = not args['direct']
     names = args['names']
 
     if not names:
@@ -122,24 +122,21 @@ def main(args):
         for file in os.listdir(config_dir):
             if file.endswith(".yaml"):
                 data_alias = os.path.splitext(file)[0]
-                file_path = os.path.join(config_dir, file)
                 any_processed = True
-                process_single(data_alias, file_path, use_temporary_view)
-
+                process_single(base_dir, data_alias)
         if not any_processed:
-            logger.info('No configurations found')
+            print('No configurations found')
     else:
         # Run only defined names
         for data_alias in args['names']:
-            file_path = os.path.join(base_dir, 'configs', data_alias + '.yaml')
-            process_single(data_alias, file_path, use_temporary_view)
+            process_single(base_dir, data_alias)
 
 
 def format_ddl(table_def):
     return sqlparse.format(table_def.rstrip(';'), reindent=True, reindent_aligned=True, keyword_case='upper')
 
 
-def process_single(data_alias, def_file, use_temporary_view):
+def process_single(base_dir, data_alias):
     # Configure logging
     for handler in logger.root.handlers[:]:
         logger.root.removeHandler(handler)
@@ -153,7 +150,17 @@ def process_single(data_alias, def_file, use_temporary_view):
     logger.getLogger().addHandler(std_handler)
 
     # Load config
-    settings = parse_config(path=def_file)
+    base_config_path = os.path.join(base_dir, 'configs')
+    if os.path.exists(base_config_path):
+        settings = hiyapyco.load(os.path.join(base_config_path, 'config.yml'),
+                                 os.path.join(base_config_path, data_alias + '.yaml'), method=hiyapyco.METHOD_MERGE)
+    else:
+        settings = hiyapyco.load(os.path.join(base_config_path, data_alias + '.yaml'))
+
+    settings = json.loads(json.dumps(settings))
+
+    # from pprint import pprint
+    # pprint(settings)
 
     print('')
     logger.info(f"Processing data set '{data_alias}'")
@@ -170,12 +177,15 @@ def process_single(data_alias, def_file, use_temporary_view):
     logger.info(f'Connected to MySQL host {mysql_host}')
 
     # Create a table definition for Clickhouse based on the query's names and data-types
-    query = settings['transfer']['query'].replace('$$', '$')
-    primary_key = settings.get('transfer.primary_key', None)
+    transfer = settings['transfer']
+    query = transfer['query']
+    range_clause_tpl = transfer.get('range_clause', None)
+    primary_key = transfer.get('primary_key', None)
+
     ch_target_db = settings['clickhouse']['db']
     data_alias = settings['clickhouse']['table_name']
     engine_def = settings['clickhouse']['engine_definition']
-    range_clause_tpl = settings.get('transfer.range_clause', None)
+
     is_incremental = range_clause_tpl is not None
 
     # Ensure table exists
@@ -203,7 +213,8 @@ def process_single(data_alias, def_file, use_temporary_view):
         # Find current max
         result = ch_client.execute(f"SELECT MAX({primary_key}) FROM {data_alias}")
         max_primary_key = result[0][0]
-        logger.debug(f"Current max value of column '{primary_key}' in Clickhouse table '{data_alias}': {max_primary_key}")
+        logger.debug(
+            f"Current max value of column '{primary_key}' in Clickhouse table '{data_alias}': {max_primary_key}")
 
         range_clause = range_clause_tpl.format(max_primary_key=max_primary_key) if range_clause_tpl is not None else ''
         view_name = ensure_view(mysql_conn, data_alias, query, range_clause)
@@ -252,11 +263,6 @@ def transfer_data(mysql_db_name, ch_table_name, client, query, ch_target_db):
     logger.info(f'Transferred {last:,} rows in %.3f seconds', timedelta(seconds=elapsed).total_seconds())
 
     return last
-
-
-def parse_config(path):
-    config = EnvYAML(path)
-    return config
 
 
 def handler():
