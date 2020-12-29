@@ -6,11 +6,11 @@ import sys
 from datetime import timedelta, datetime
 from time import time
 
-import confuse
 import humanize
 import mysql.connector
 import sqlparse
 from clickhouse_driver import Client
+from envyaml import EnvYAML
 
 
 def convert_type(mysql_type):
@@ -40,7 +40,7 @@ def convert_type(mysql_type):
     if 'binary' in lower:
         return 'FixedString'
     if 'bit' in lower or 'boolean' in lower:
-        return 'Boolean'
+        return 'UInt8'
     return 'String'
 
 
@@ -153,21 +153,16 @@ def process_single(data_alias, def_file, use_temporary_view):
     logger.getLogger().addHandler(std_handler)
 
     # Load config
-    settings = confuse.Configuration('my2ch', __name__)
-    try:
-        settings.set_file(def_file)
-    except confuse.exceptions.ConfigReadError as e:
-        print(repr(e))
-        exit(1)
+    settings = parse_config(path=def_file)
 
     print('')
     logger.info(f"Processing data set '{data_alias}'")
 
     # Connect to MYSQL
-    mysql_host = settings['mysql']['host'].get()
-    mysql_user = settings['mysql']['user'].get()
-    mysql_password = settings['mysql']['pass'].get()
-    mysql_db = settings['mysql']['db'].get()
+    mysql_host = settings['mysql']['host']
+    mysql_user = settings['mysql']['user']
+    mysql_password = settings['mysql']['pass']
+    mysql_db = settings['mysql']['db']
     mysql_conn = mysql.connector.connect(host=mysql_host,
                                          user=mysql_user,
                                          password=mysql_password,
@@ -175,33 +170,27 @@ def process_single(data_alias, def_file, use_temporary_view):
     logger.info(f'Connected to MySQL host {mysql_host}')
 
     # Create a table definition for Clickhouse based on the query's names and data-types
-    query = settings['transfer']['query'].get()
-    primary_key = settings['transfer']['primary_key'].get()
-    ch_target_db = settings['clickhouse']['db'].get()
-    data_alias = settings['clickhouse']['table_name'].get()
-    engine_def = settings['clickhouse']['engine_definition'].get()
+    query = settings['transfer']['query'].replace('$$', '$')
+    primary_key = settings['transfer']['primary_key']
+    ch_target_db = settings['clickhouse']['db']
+    data_alias = settings['clickhouse']['table_name']
+    engine_def = settings['clickhouse']['engine_definition']
 
     # Ensure table exists
-    clickhouse_url = settings['clickhouse']['url'].get()
+    clickhouse_url = settings['clickhouse']['url']
     logger.debug('Using Clickhouse URL %s', clickhouse_url)
     ch_client = Client.from_url(clickhouse_url)
 
     table_def = clickhouse_table_def(mysql_conn, query, engine_def, ch_target_db, data_alias)
+    logger.debug(f'Clickhouse table definition: {table_def}')
     table_exists = ch_client.execute(f'EXISTS TABLE {data_alias}')[0][0] == 1
     if table_exists:
         # Compare the generated table to the spec to see if something has changed
         existing_table_def = ch_client.execute(f'SHOW CREATE TABLE {data_alias}')[0][0]
-
-        # import difflib
-        # expected = format_ddl(existing_table_def)
-        # actual = format_ddl(table_def)
-        # diff = difflib.unified_diff(expected, actual)
-        # diff_str = (''.join(diff))
         if format_ddl(existing_table_def) != format_ddl(table_def):
-            logger.warning(
-                f"Clickhouse definition for table '{data_alias}' seem to be out of date. Please drop the table and let it rebuild if possible.")
+            logger.warning(f"Clickhouse definition for table '{data_alias}' "
+                           f"seem to be out of date. Please drop the table and let it rebuild if possible.")
     else:
-        logger.debug(f'Clickhouse table definition: {table_def}')
         ch_client.execute(table_def)
 
     # Create MySQL engine in clickhouse as proxy to mysql data
@@ -214,7 +203,7 @@ def process_single(data_alias, def_file, use_temporary_view):
     result = ch_client.execute(f"SELECT MAX({primary_key}) FROM {data_alias}")
     max_primary_key = result[0][0]
     logger.debug(f"Current max value of column '{primary_key}' in Clickhouse table '{data_alias}': {max_primary_key}")
-    range_clause_tpl = settings['transfer']['range_clause'].get()
+    range_clause_tpl = settings['transfer']['range_clause']
     range_clause = range_clause_tpl.format(max_primary_key=max_primary_key) if range_clause_tpl is not None else ''
 
     # Insert data from above proxy into real clickhouse table
@@ -268,6 +257,11 @@ def transfer_data(ch_table_name, client, query, range_clause, ch_target_db):
     logger.info(f'Transferred {last:,} rows in %.3f seconds', timedelta(seconds=elapsed).total_seconds())
 
     return last
+
+
+def parse_config(path):
+    config = EnvYAML(path)
+    return config
 
 
 def handler(sig, frame):
