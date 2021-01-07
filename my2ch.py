@@ -235,11 +235,11 @@ def process_single(base_dir, data_alias):
         now_timestamp = time()
         offset = datetime.fromtimestamp(now_timestamp) - datetime.utcfromtimestamp(now_timestamp)
         local_time = utc_datetime + offset
-
+        ratio = storage_stats['uncompressed'] / storage_stats['compressed'] if storage_stats['uncompressed'] > 0 and storage_stats['compressed'] > 0 else 0.0
         logger.info(f"=== Status ===\nTotal rows: {storage_stats['rows']:,}"
                     f"\nLast modified: {humanize.naturaldelta(local_time)} ago ({utc_datetime}Z)"
                     f"\nDisk usage: {humanize.naturalsize(storage_stats['disk_size'])}"
-                    f"\nCompression ratio: {storage_stats['uncompressed'] / storage_stats['compressed']:.2f}X"
+                    f"\nCompression ratio: {ratio:.2f}X"
                     f"\nStorage engine: {storage_stats['engine']}"
                     )
     else:
