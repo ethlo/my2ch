@@ -1,15 +1,10 @@
 version: '3.1'
-
 services:
-
   mysql-server:
     networks:
       - db-network
     image: mysql:8.0.22
-    command: --default-authentication-plugin=mysql_native_password
     restart: unless-stopped
-    ports:
-      - "33306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: example
 
@@ -17,8 +12,6 @@ services:
     networks:
       - db-network
     image: yandex/clickhouse-server
-    ports:
-      - "39000:9000"
     ulimits:
       nproc: 65535
       nofile:

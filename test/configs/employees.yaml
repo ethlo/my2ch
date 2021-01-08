@@ -1,12 +1,4 @@
-mysql:
-  user: ${MYSQL_USER}
-  pass: ${MYSQL_PASS}
-  db: employees
-  host: ${MYSQL_SERVER}
-
 clickhouse:
-  url: $CLICKHOUSE_URL
-  db: $CLICKHOUSE_DB
   table_name: employees
   engine_definition: ENGINE = MergeTree
     ORDER BY from_date
@@ -18,3 +10,6 @@ transfer:
   query: select e.emp_no, birth_date, s.from_date, s.to_date, s.salary
     from salaries s
     left join employees e on s.emp_no = e.emp_no
+
+schedule:
+  interval: 30

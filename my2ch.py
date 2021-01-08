@@ -1,11 +1,14 @@
 import argparse
 import json
+import schedule
 import logging as logger
 import os
+import isodate
 import signal
 import sys
 from datetime import timedelta, datetime
 from time import time
+from time import sleep
 
 import hiyapyco
 import humanize
@@ -131,6 +134,13 @@ def main(args):
         for data_alias in args['names']:
             process_single(base_dir, data_alias)
 
+    if schedule.next_run():
+        print("\n")
+        logger.info('Waiting for next scheduler invocation')
+        while True:
+            schedule.run_pending()
+            sleep(1)
+
 
 def format_ddl(table_def):
     return sqlparse.format(table_def.rstrip(';'), reindent=True, reindent_aligned=True, keyword_case='upper')
@@ -151,20 +161,23 @@ def process_single(base_dir, data_alias):
 
     # Load config
     base_config_path = os.path.join(base_dir, 'configs')
-    if os.path.exists(base_config_path):
-        settings = hiyapyco.load(os.path.join(base_config_path, 'config.yml'),
-                                 os.path.join(base_config_path, data_alias + '.yaml'), method=hiyapyco.METHOD_MERGE)
-    else:
-        settings = hiyapyco.load(os.path.join(base_config_path, data_alias + '.yaml'))
-
+    settings = hiyapyco.load(os.path.join(base_config_path, 'config.yml'),
+                             os.path.join(base_config_path, data_alias + '.yaml'), method=hiyapyco.METHOD_MERGE)
     settings = json.loads(json.dumps(settings))
 
-    # from pprint import pprint
-    # pprint(settings)
+    if 'schedule' in settings and 'interval' in settings['schedule']:
+        duration = settings['schedule']['interval'].strip()
+        logger.debug(f'Schedule interval of duration {duration}')
+        interval = isodate.parse_duration(duration)
+        logger.info(f'Scheduling "{data_alias}" to run every {interval}')
+        schedule.every(interval.total_seconds()).seconds.do(doRun, data_alias, settings)
 
     print('')
-    logger.info(f"Processing data set '{data_alias}'")
+    doRun(data_alias, settings)
 
+
+def doRun(data_alias, settings):
+    logger.info(f"Processing data set '{data_alias}'")
     # Connect to MYSQL
     mysql_host = settings['mysql']['host']
     mysql_user = settings['mysql']['user']
@@ -175,24 +188,19 @@ def process_single(base_dir, data_alias):
                                          password=mysql_password,
                                          database=mysql_db)
     logger.info(f'Connected to MySQL host {mysql_host}')
-
     # Create a table definition for Clickhouse based on the query's names and data-types
     transfer = settings['transfer']
     query = transfer['query']
     range_clause_tpl = transfer.get('range_clause', None)
     primary_key = transfer.get('primary_key', None)
-
     ch_target_db = settings['clickhouse']['db']
     data_alias = settings['clickhouse']['table_name']
     engine_def = settings['clickhouse']['engine_definition']
-
     is_incremental = range_clause_tpl is not None
-
     # Ensure table exists
     clickhouse_url = settings['clickhouse']['url']
     logger.debug('Using Clickhouse URL %s', clickhouse_url)
     ch_client = Client.from_url(clickhouse_url)
-
     table_def = clickhouse_table_def(mysql_conn, query, engine_def, ch_target_db, data_alias)
     logger.debug(f'Clickhouse table definition: {table_def}')
     table_exists = ch_client.execute(f'EXISTS TABLE {data_alias}')[0][0] == 1
@@ -202,13 +210,11 @@ def process_single(base_dir, data_alias):
         if format_ddl(existing_table_def) != format_ddl(table_def):
             logger.warning(f"Clickhouse definition for table '{data_alias}' "
                            f"seem to be out of date. Please drop the table and let it rebuild if possible.")
-
     # Create MySQL engine in clickhouse as proxy to mysql data
     logger.debug('Ensuring clickhouse connection to MySQL is set up')
     create_mysql_engine = f"CREATE DATABASE IF NOT EXISTS mysql_{mysql_db} ENGINE = MySQL('{mysql_host}', '{mysql_db}', '{mysql_user}', '{mysql_password}')"
     logger.debug('Command to create MySQL DB proxy in Clickhouse: %s', create_mysql_engine)
     ch_client.execute(create_mysql_engine)
-
     if is_incremental and table_exists:
         # Find current max
         result = ch_client.execute(f"SELECT MAX({primary_key}) FROM {data_alias}")
@@ -223,11 +229,9 @@ def process_single(base_dir, data_alias):
         logger.debug(f'Creating clickhouse table {data_alias}')
         ch_client.execute(table_def)
         view_name = ensure_view(mysql_conn, data_alias, query, None)
-
     # Insert data from above proxy into real clickhouse table
     transfer_data(mysql_db, data_alias, ch_client, f"SELECT * FROM {view_name}", ch_target_db)
     drop_view(mysql_conn, view_name)
-
     # Output clickhouse table stats
     storage_stats = fetch_storage_stats(ch_client, ch_target_db, data_alias)
     if storage_stats is not None:
@@ -235,7 +239,8 @@ def process_single(base_dir, data_alias):
         now_timestamp = time()
         offset = datetime.fromtimestamp(now_timestamp) - datetime.utcfromtimestamp(now_timestamp)
         local_time = utc_datetime + offset
-        ratio = storage_stats['uncompressed'] / storage_stats['compressed'] if storage_stats['uncompressed'] > 0 and storage_stats['compressed'] > 0 else 0.0
+        ratio = storage_stats['uncompressed'] / storage_stats['compressed'] if storage_stats['uncompressed'] > 0 and \
+                                                                               storage_stats['compressed'] > 0 else 0.0
         logger.info(f"=== Status ===\nTotal rows: {storage_stats['rows']:,}"
                     f"\nLast modified: {humanize.naturaldelta(local_time)} ago ({utc_datetime}Z)"
                     f"\nDisk usage: {humanize.naturalsize(storage_stats['disk_size'])}"
@@ -265,7 +270,7 @@ def transfer_data(mysql_db_name, ch_table_name, client, query, ch_target_db):
     return last
 
 
-def handler():
+def handler(signal, handler):
     global c
     print("\nExiting...")
     sys.exit(0)
