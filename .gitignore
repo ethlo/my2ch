@@ -1,3 +1,5 @@
+*.iml
+/java/target
 test/tmp
 logs/*
 .idea
