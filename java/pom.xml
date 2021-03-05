@@ -15,20 +15,23 @@
     </parent>
     <modules>
         <module>my2ch-core</module>
+        <module>my2ch-cli</module>
     </modules>
-    <dependencies>
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.19</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.ethlo.clackshack</groupId>
-            <artifactId>clackshack</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
-        </dependency>
-    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>8.0.19</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.ethlo.clackshack</groupId>
+                <artifactId>clackshack</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <build>
         <pluginManagement>
             <plugins>

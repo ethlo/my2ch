@@ -1,4 +1,4 @@
-package com.ethlo.my2ch;
+package com.ethlo.my2ch.config;
 
 /*-
  * #%L
@@ -9,9 +9,9 @@ package com.ethlo.my2ch;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,21 +20,34 @@ package com.ethlo.my2ch;
  * #L%
  */
 
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+@Valid
 public class MysqlConfig
 {
+    @NotNull
     private final String host;
-    private final int port;
-    private final String username;
-    private final String password;
-    private final String dbName;
 
-    public MysqlConfig(final String host, final int port, final String username, final String password, final String dbName)
+    @NotNull
+    private final int port;
+
+    @NotNull
+    private final String username;
+
+    @NotNull
+    private final String password;
+
+    @NotNull
+    private final String db;
+
+    public MysqlConfig(final String host, final int port, final String username, final String password, final String db)
     {
         this.host = host;
         this.port = port;
         this.username = username;
         this.password = password;
-        this.dbName = dbName;
+        this.db = db;
     }
 
     public String getHost()
@@ -57,8 +70,8 @@ public class MysqlConfig
         return port;
     }
 
-    public String getDbName()
+    public String getDb()
     {
-        return dbName;
+        return db;
     }
 }

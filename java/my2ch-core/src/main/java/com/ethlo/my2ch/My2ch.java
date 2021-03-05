@@ -9,9 +9,9 @@ package com.ethlo.my2ch;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,6 +24,11 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+
+import javax.sql.DataSource;
+import javax.validation.Valid;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,10 +37,16 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.util.StringUtils;
 
 import com.ethlo.clackshack.ClackShack;
+import com.ethlo.clackshack.ClackShackImpl;
 import com.ethlo.clackshack.QueryOptions;
 import com.ethlo.clackshack.model.DataTypes;
+import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.clackshack.util.IOUtil;
+import com.ethlo.my2ch.config.MysqlConfig;
+import com.ethlo.my2ch.config.Source;
+import com.ethlo.my2ch.config.Target;
+import com.ethlo.my2ch.config.TransferConfig;
 
 public class My2ch
 {
@@ -43,15 +54,17 @@ public class My2ch
     private static final Logger logger = LoggerFactory.getLogger(My2ch.class);
     private final NamedParameterJdbcTemplate tpl;
     private final ClackShack clackShack;
-    private final MysqlConfig mysqlConfig;
+    private final TransferConfig config;
 
-    public My2ch(final MysqlConfig mysqlConfig, final ClackShack clackShack)
+    public My2ch(@Valid final TransferConfig config)
     {
-        this.mysqlConfig = mysqlConfig;
-        final String url = "jdbc:mysql://" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDbName() + "?useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true";
-        this.tpl = new NamedParameterJdbcTemplate(new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true));
+        final MysqlConfig mysqlConfig = config.getSource().getMysql();
+        final String url = "jdbc:mysql://" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDb() + "?useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true";
+        final DataSource dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
+        this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
-        this.clackShack = clackShack;
+        this.clackShack = new ClackShackImpl(config.getTarget().getClickhouse().getUrl());
+        this.config = config;
     }
 
     public String convertMysqlToClickhouseType(final String mysqlType)
@@ -154,45 +167,26 @@ public class My2ch
         return viewName;
     }
 
-    public void processSingle(TransferConfig config)
-    {
-        final TransferConfig.Source source = config.getSource();
-        final TransferConfig.Target target = config.getTarget();
-        final boolean isIncremental = source.getRangeClause() != null;
-        final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getDb(), config.getAlias());
-        logger.debug("Clickhouse table definition: {}", tableDef);
-        final ResultSet result = clackShack.query("EXISTS TABLE " + config.getAlias()).join();
-        final boolean tableExists = result.get(0, 0, Number.class).intValue() == 1;
-        final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
-
-        final String createMysqlEngine = "CREATE DATABASE IF NOT EXISTS mysql_"
-                + mysqlDbName + " ENGINE = MySQL(" + mysqlConfig.getHost() + ", '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
-        logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
-        clackShack.ddl(createMysqlEngine).join();
-
-        final String viewName = setupView(config, isIncremental, tableExists, tableDef);
-
-        transferData("SELECT * FROM mysql_" + mysqlDbName + "." + viewName, target.getDb(), config.getAlias());
-        dropView(viewName);
-    }
-
-    private void transferData(final String query, final String targetDb, final String targetTable)
+    private long transferData(final String query, final String targetDb, final String targetTable, final Function<QueryProgress, Boolean> listener)
     {
         logger.debug("Transferring data from MySQL query to Clickhouse table {}.{}", targetDb, targetTable);
         final String transferQuery = "insert into " + targetDb + "." + targetTable + " " + query;
         logger.debug("Transfer query: {}", transferQuery);
+        final AtomicLong max = new AtomicLong();
         clackShack.insert(transferQuery, QueryOptions.create().progressListener(queryProgress ->
         {
-            logger.info("Progress: {}", queryProgress);
-            return true;
+            logger.debug("Progress: {}", queryProgress);
+            max.set(queryProgress.getReadRows());
+            return listener.apply(queryProgress);
         })).join();
+        return max.get();
     }
 
     private String setupView(final TransferConfig config, final boolean isIncremental, final boolean tableExists, final String tableDef)
     {
-        final TransferConfig.Source source = config.getSource();
-        final TransferConfig.Target target = config.getTarget();
-        final String targetDbAndTable = target.getDb() + "." + config.getAlias();
+        final Source source = config.getSource();
+        final Target target = config.getTarget();
+        final String targetDbAndTable = target.getClickhouse().getDb() + "." + config.getAlias();
 
         if (isIncremental && tableExists)
         {
@@ -216,6 +210,33 @@ public class My2ch
 
     public Map<String, Object> getStats(final TransferConfig config)
     {
-        return fetchStorageStats(config.getTarget().getDb(), config.getAlias()).asMap().iterator().next();
+        final ResultSet result = fetchStorageStats(config.getTarget().getClickhouse().getDb(), config.getAlias());
+        return !result.isEmpty() ? result.asMap().iterator().next() : Collections.emptyMap();
+    }
+
+    public long run(final Function<QueryProgress, Boolean> progressListener)
+    {
+        final Source source = config.getSource();
+        final Target target = config.getTarget();
+        final boolean isIncremental = source.getRangeClause() != null;
+        final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getClickhouse().getDb(), config.getAlias());
+        logger.debug("Clickhouse table definition: {}", tableDef);
+        final ResultSet result = clackShack.query("EXISTS TABLE " + config.getAlias()).join();
+        final boolean tableExists = result.get(0, 0, Number.class).intValue() == 1;
+        final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
+
+        final MysqlConfig mysqlConfig = config.getSource().getMysql();
+
+        final String createMysqlEngine = "CREATE DATABASE IF NOT EXISTS mysql_"
+                + mysqlDbName + " ENGINE = MySQL(" + mysqlConfig.getHost() + ", '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
+        logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
+        clackShack.ddl(createMysqlEngine).join();
+
+        final String viewName = setupView(config, isIncremental, tableExists, tableDef);
+
+        final long transferred = transferData("SELECT * FROM mysql_" + mysqlDbName + "." + viewName, target.getClickhouse().getDb(), config.getAlias(), progressListener);
+        dropView(viewName);
+
+        return transferred;
     }
 }
