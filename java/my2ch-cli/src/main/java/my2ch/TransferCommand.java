@@ -31,10 +31,10 @@ public class TransferCommand implements Callable<Integer>
         final Map<String, String> envVariables = System.getenv();
 
         final Path mysqlConfigPath = home.resolve("mysql.yml");
-        final MysqlConfig mysqlConfig= mapper.readValue(mysqlConfigPath.toFile(), MysqlConfig.class);
+        final MysqlConfig mysqlConfig = mapper.readValue(mysqlConfigPath.toFile(), MysqlConfig.class);
 
         final Path clickHouseConfigPath = home.resolve("clickhouse.yml");
-        final ClickHouseConfig clickhouseConfig= mapper.readValue(mysqlConfigPath.toFile(), ClickHouseConfig.class);
+        final ClickHouseConfig clickhouseConfig = mapper.readValue(mysqlConfigPath.toFile(), ClickHouseConfig.class);
 
         //final My2ch my2ch = new My2ch();
 

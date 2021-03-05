@@ -193,7 +193,7 @@ public class My2ch
             // Find current max
             final ResultSet maxResult = clackShack.query("SELECT MAX(" + target.getPrimaryKey() + ") FROM " + targetDbAndTable).join();
             final long max = maxResult.get(0, 0, Number.class).longValue();
-            logger.info("Current max value of column {} in Clickhouse table '{}': {}", target.getPrimaryKey(), config.getAlias(), max);
+            logger.debug("Current max value of column {} in Clickhouse table '{}': {}", target.getPrimaryKey(), config.getAlias(), max);
 
             final String rangeClauseTpl = config.getSource().getRangeClause();
             final String rangeClause = rangeClauseTpl != null ? rangeClauseTpl.replaceAll("\\$\\{max_primary_key}", "" + max) : null;

@@ -23,26 +23,21 @@ package com.ethlo.my2ch;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Set;
-
-import javax.validation.ConstraintViolation;
-import javax.validation.Validation;
-import javax.validation.Validator;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.util.StringUtils;
 
 import com.ethlo.my2ch.config.TransferConfig;
-import my2ch.My2chConfigLoader;
 
 @SpringBootTest(classes = Cfg.class)
 @RunWith(SpringRunner.class)
 public class SmokeTest
 {
-    Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+    private static final Logger logger = LoggerFactory.getLogger(SmokeTest.class);
 
     @Test
     public void testTransfer() throws IOException
@@ -50,15 +45,13 @@ public class SmokeTest
         final Path baseDir = Paths.get("/home/morten/dev/ethlo/my2ch/java/my2ch-cli/src/test/resources/samples");
         final String alias = "foo1";
         final TransferConfig config = My2chConfigLoader.loadConfig(baseDir, alias);
-        Set<ConstraintViolation<TransferConfig>> violations = validator.validate(config);
-        if (!violations.isEmpty())
-        {
-            throw new IllegalArgumentException(StringUtils.collectionToCommaDelimitedString(violations));
-        }
-
         final My2ch my2ch = new My2ch(config);
-        final long transferred = my2ch.run(queryProgress -> true);
-        System.out.println("Transferred: " + transferred);
-        System.out.println(my2ch.getStats(config));
+        final long transferred = my2ch.run(queryProgress ->
+        {
+            logger.info("Progress: {}", queryProgress);
+            return true;
+        });
+        logger.info("Transferred: {}", transferred);
+        logger.info("Table stats: {}", my2ch.getStats(config));
     }
 }

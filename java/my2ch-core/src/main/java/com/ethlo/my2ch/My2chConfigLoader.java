@@ -1,9 +1,14 @@
-package my2ch;
+package com.ethlo.my2ch;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
 
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.ConfigurationProperty;
@@ -12,11 +17,14 @@ import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.origin.PropertySourceOrigin;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.util.StringUtils;
 
 import com.ethlo.my2ch.config.TransferConfig;
 
 public class My2chConfigLoader
 {
+    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
     public static TransferConfig loadConfig(final Path baseDir, final String alias) throws IOException
     {
         final FileSystemResource baseConfigResource = new FileSystemResource(baseDir.resolve("base.yml"));
@@ -46,6 +54,13 @@ public class My2chConfigLoader
             return null;
         };
         final Binder binder = new Binder(s);
-        return binder.bind("", ValidatedTransferConfig.class).get();
+        final TransferConfig config = binder.bind("", TransferConfig.class).get();
+        Set<ConstraintViolation<TransferConfig>> violations = validator.validate(config);
+        if (!violations.isEmpty())
+        {
+            throw new IllegalArgumentException(StringUtils.collectionToCommaDelimitedString(violations));
+        }
+
+        return config;
     }
 }
