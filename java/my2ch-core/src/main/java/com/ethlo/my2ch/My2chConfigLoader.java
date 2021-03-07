@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -23,6 +24,7 @@ import org.springframework.boot.context.properties.source.ConfigurationPropertyS
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.origin.PropertySourceOrigin;
 import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.util.StringUtils;
 
@@ -52,12 +54,20 @@ public class My2chConfigLoader
         final FileSystemResource configResource = ymlConfigResource.exists() ? ymlConfigResource : yamlConfigResource;
 
         final List<PropertySource<?>> propertySources = new LinkedList<>();
+
+        // System environment
+        final Map env = System.getenv();
+        propertySources.add(new SystemEnvironmentPropertySource("env", env));
+
+        // Config file
+        propertySources.addAll(new YamlPropertySourceLoader().load(alias, configResource));
+
+        // Base config file
         if (baseConfigResource.exists())
         {
             propertySources.addAll(new YamlPropertySourceLoader().load("base", baseConfigResource));
         }
 
-        propertySources.addAll(new YamlPropertySourceLoader().load(alias, configResource));
         final ConfigurationPropertySource s = name ->
         {
             if (name == null)

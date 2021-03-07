@@ -61,6 +61,7 @@ public class My2ch
     {
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
         final String url = "jdbc:mysql://" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDb() + "?useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true";
+        logger.info("Connecting to {}", url);
         final DataSource dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
