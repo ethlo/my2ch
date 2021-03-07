@@ -48,6 +48,7 @@ public class TransferCommand implements Callable<Long>
             }
 
         }
+        logger.info("Completed with a total of {} copied rows", total);
         return total;
     }
 
