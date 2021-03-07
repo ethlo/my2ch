@@ -1,6 +1,8 @@
 package com.ethlo.my2ch.scheduler;
 
+import java.text.NumberFormat;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,7 +23,7 @@ public class My2chScheduler
     public My2chScheduler(final int poolSize)
     {
         this.taskScheduler = new TaskSchedulerBuilder()
-                .threadNamePrefix("my2ch-scheduler")
+                .threadNamePrefix("my2ch-")
                 .poolSize(poolSize)
                 .build();
         taskScheduler.initialize();
@@ -29,10 +31,25 @@ public class My2chScheduler
 
     public void runAtInterval(final My2ch task, final Duration interval)
     {
-        taskScheduler.scheduleWithFixedDelay(() -> {
-            final long copied = task.run(p -> true);
+        taskScheduler.scheduleWithFixedDelay(() ->
+        {
+            final NumberFormat nf = NumberFormat.getInstance(Locale.getDefault());
+            nf.setGroupingUsed(true);
+            nf.setMaximumFractionDigits(2);
+
+            final long started = System.nanoTime();
+            logger.info("Running task {}", task.getConfig().getAlias());
+            final long rowCount = task.run(progress ->
+            {
+                logger.info("Copy in progress: {}", nf.format(progress.getReadRows()));
+                return true;
+            });
             final Map<String, Object> stats = task.getStats(task.getConfig());
-            logger.info("Statistics for {}. {} new rows. {} total rows. Last modified {}", task.getConfig().getAlias(), copied, stats.get("rows"), stats.get("last_modified"));
+            final long elapsed = System.nanoTime() - started;
+            final double rowsPerSec = rowCount / (elapsed / 1_000_000_000D);
+            logger.info("Completed task {}. {} new rows in {} ({}/sec). {} total rows. Last modified {}",
+                    task.getConfig().getAlias(), nf.format(rowCount), Duration.ofNanos(elapsed), nf.format(rowsPerSec), nf.format(stats.get("rows")), stats.get("last_modified")
+            );
         }, interval);
     }
 
