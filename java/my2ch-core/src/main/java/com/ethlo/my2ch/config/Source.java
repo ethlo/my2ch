@@ -20,7 +20,7 @@ public class Source
     public Source(
             @JsonProperty("mysql") final MysqlConfig mysql,
             @JsonProperty("query") final String query,
-            @JsonProperty("range_clause") final String rangeClause)
+            @JsonProperty("range-clause") final String rangeClause)
     {
         this.mysql = mysql;
         this.rangeClause = rangeClause;

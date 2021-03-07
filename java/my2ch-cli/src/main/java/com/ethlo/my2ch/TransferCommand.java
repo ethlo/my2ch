@@ -3,14 +3,14 @@ package com.ethlo.my2ch;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.ethlo.my2ch.My2ch;
-import com.ethlo.my2ch.My2chConfigLoader;
 import com.ethlo.my2ch.config.TransferConfig;
+import com.ethlo.my2ch.scheduler.My2chScheduler;
 import picocli.CommandLine;
 
 @Component
@@ -28,27 +28,31 @@ public class TransferCommand implements Callable<Long>
     @CommandLine.Option(names = "--service", description = "Run as background-service")
     private Boolean service;
 
-    public Long call()
+    public Long call() throws InterruptedException
     {
-        long total = 0;
-        if (names != null && !names.isEmpty())
-        {
-            for (String name : names)
-            {
-                final TransferConfig config = My2chConfigLoader.loadConfig(home, name);
-                total += processSingle(config);
-            }
-        }
-        else
-        {
-            final List<TransferConfig> configs = My2chConfigLoader.loadConfigs(home);
-            for (final TransferConfig config : configs)
-            {
-                total += processSingle(config);
-            }
+        final My2chScheduler scheduler = new My2chScheduler(1);
+        final boolean schedule = service != null && service;
 
+        final List<String> aliases = (names != null && !names.isEmpty()) ? names : My2chConfigLoader.getConfigs(home);
+        long total = 0;
+        for (String alias : aliases)
+        {
+            final TransferConfig config = My2chConfigLoader.loadConfig(home, alias);
+            total += processSingle(config);
+            if (schedule)
+            {
+                scheduler.runAtInterval(config);
+            }
         }
+
         logger.info("Completed with a total of {} copied rows", total);
+
+        if (schedule)
+        {
+            final CountDownLatch latch = new CountDownLatch(1);
+            latch.await();
+        }
+
         return total;
     }
 

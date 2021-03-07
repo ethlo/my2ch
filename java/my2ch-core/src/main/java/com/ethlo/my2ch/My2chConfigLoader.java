@@ -105,6 +105,11 @@ public class My2chConfigLoader
         return filename;
     }
 
+    public static List<String> getConfigs(final Path basePath)
+    {
+        return getConfigFiles(basePath).stream().map(p -> getBaseName(p.getFileName().toString())).collect(Collectors.toList());
+    }
+
     private static List<Path> getConfigFiles(final Path basePath)
     {
         try (final Stream<Path> st = Files.list(basePath))

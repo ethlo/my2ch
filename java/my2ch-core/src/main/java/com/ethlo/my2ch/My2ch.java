@@ -129,6 +129,8 @@ public class My2ch
     {
         final String tmpName = "my2ch_" + clickHouseTargetTableName;
 
+        tpl.update("DROP TABLE IF EXISTS " + tmpName, Collections.emptyMap());
+
         tpl.update("CREATE TEMPORARY TABLE `" + tmpName + "` AS " + query + " LIMIT 0", Collections.emptyMap());
 
         final StringBuilder s = new StringBuilder();
@@ -184,7 +186,7 @@ public class My2ch
         return max.get();
     }
 
-    private String setupView(final TransferConfig config, final boolean isIncremental, final boolean tableExists, final String tableDef)
+    private String setupView(final TransferConfig config, final boolean isIncremental, final boolean tableExists)
     {
         final Source source = config.getSource();
         final Target target = config.getTarget();
@@ -198,11 +200,14 @@ public class My2ch
             logger.debug("Current max value of column {} in Clickhouse table '{}': {}", target.getPrimaryKey(), config.getAlias(), max);
 
             final String rangeClauseTpl = config.getSource().getRangeClause();
-            final String rangeClause = rangeClauseTpl != null ? rangeClauseTpl.replaceAll("\\$\\{max_primary_key}", "" + max) : null;
+            final String rangeClause = rangeClauseTpl != null ? rangeClauseTpl.replaceAll("\\{max_primary_key}", "" + max) : null;
             return createView(config.getAlias(), source.getQuery(), rangeClause);
         }
         else
         {
+            final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getClickhouse().getDb(), config.getAlias());
+            logger.debug("Clickhouse table definition: {}", tableDef);
+
             clackShack.ddl("DROP TABLE IF EXISTS " + targetDbAndTable);
             logger.debug("Creating clickhouse table {}", config.getAlias());
             clackShack.ddl(tableDef).join();
@@ -221,10 +226,9 @@ public class My2ch
         final Source source = config.getSource();
         final Target target = config.getTarget();
         final boolean isIncremental = source.getRangeClause() != null;
-        final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getClickhouse().getDb(), config.getAlias());
-        logger.debug("Clickhouse table definition: {}", tableDef);
         final ResultSet result = clackShack.query("EXISTS TABLE " + config.getAlias()).join();
         final boolean tableExists = result.get(0, 0, Number.class).intValue() == 1;
+
         final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
 
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
@@ -234,7 +238,7 @@ public class My2ch
         logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
         clackShack.ddl(createMysqlEngine).join();
 
-        final String viewName = setupView(config, isIncremental, tableExists, tableDef);
+        final String viewName = setupView(config, isIncremental, tableExists);
 
         final long transferred = transferData("SELECT * FROM mysql_" + mysqlDbName + "." + viewName, target.getClickhouse().getDb(), config.getAlias(), progressListener);
         dropView(viewName);
