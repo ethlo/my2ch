@@ -28,7 +28,7 @@
         </encoder>
     </appender>
 
-    <logger name="com.ethlo" level="INFO"/>
+    <logger name="com.ethlo" level="DEBUG"/>
 
     <root level="INFO">
         <appender-ref ref="stdout"/>

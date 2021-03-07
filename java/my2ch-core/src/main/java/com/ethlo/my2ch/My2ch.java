@@ -43,6 +43,7 @@ import com.ethlo.clackshack.model.DataTypes;
 import com.ethlo.clackshack.model.QueryProgress;
 import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.clackshack.util.IOUtil;
+import com.ethlo.my2ch.config.ClickHouseConfig;
 import com.ethlo.my2ch.config.MysqlConfig;
 import com.ethlo.my2ch.config.Source;
 import com.ethlo.my2ch.config.Target;
@@ -63,7 +64,8 @@ public class My2ch
         final DataSource dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
-        this.clackShack = new ClackShackImpl(config.getTarget().getClickhouse().getUrl());
+        final ClickHouseConfig chCfg = config.getTarget().getClickhouse();
+        this.clackShack = new ClackShackImpl("http://" + chCfg.getHost() + ":" + chCfg.getPort());
         this.config = config;
     }
 
@@ -238,5 +240,10 @@ public class My2ch
         dropView(viewName);
 
         return transferred;
+    }
+
+    public TransferConfig getConfig()
+    {
+        return config;
     }
 }

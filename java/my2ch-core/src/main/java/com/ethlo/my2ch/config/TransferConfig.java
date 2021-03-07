@@ -31,7 +31,6 @@ public class TransferConfig
     private final String alias;
 
     @Valid
-    @NotNull
     private final Schedule schedule;
 
     @Valid

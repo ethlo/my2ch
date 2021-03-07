@@ -1,9 +1,12 @@
-package my2ch;
+package com.ethlo.my2ch;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import my2ch.TransferCommand;
+import picocli.CommandLine;
 
 @SpringBootApplication
 public class My2chRunner implements CommandLineRunner, ExitCodeGenerator
@@ -19,8 +22,7 @@ public class My2chRunner implements CommandLineRunner, ExitCodeGenerator
     @Override
     public void run(String... args)
     {
-        // let picocli parse command line args and run the business logic
-        //exitCode = new CommandLine(mailCommand, factory).execute(args);
+        exitCode = new CommandLine(new TransferCommand()).execute(args);
     }
 
     @Override

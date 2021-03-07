@@ -8,21 +8,30 @@ public class ClickHouseConfig
     private final String db;
 
     @NotNull
-    private final String url;
+    private final String host;
 
-    public ClickHouseConfig(final @NotNull String db, final @NotNull String url)
+    @NotNull
+    private final int port;
+
+    public ClickHouseConfig(final @NotNull String db, final @NotNull String host, final int port)
     {
         this.db = db;
-        this.url = url;
-    }
-
-    public String getUrl()
-    {
-        return url;
+        this.host = host;
+        this.port = port;
     }
 
     public String getDb()
     {
         return db;
+    }
+
+    public String getHost()
+    {
+        return host;
+    }
+
+    public int getPort()
+    {
+        return port;
     }
 }
