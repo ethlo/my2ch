@@ -18,6 +18,7 @@ import picocli.CommandLine;
 public class TransferCommand implements Callable<Long>
 {
     private static final Logger logger = LoggerFactory.getLogger(TransferCommand.class);
+    private final My2chScheduler scheduler;
 
     @CommandLine.Option(names = "--names", description = "The name of config(s) to run. Undefined runs all")
     private List<String> names;
@@ -28,9 +29,13 @@ public class TransferCommand implements Callable<Long>
     @CommandLine.Option(names = "--service", description = "Run as background-service")
     private Boolean service;
 
+    public TransferCommand(My2chScheduler scheduler)
+    {
+        this.scheduler = scheduler;
+    }
+
     public Long call() throws InterruptedException
     {
-        final My2chScheduler scheduler = new My2chScheduler(1);
         final boolean schedule = service != null && service;
 
         final List<String> aliases = (names != null && !names.isEmpty()) ? names : My2chConfigLoader.getConfigs(home);
@@ -59,11 +64,13 @@ public class TransferCommand implements Callable<Long>
     private long processSingle(final TransferConfig config)
     {
         logger.info("Processing {}", config.getAlias());
-        final My2ch my2ch = new My2ch(config);
-        return my2ch.run(queryProgress ->
+        try (final My2ch my2ch = new My2ch(config))
         {
-            logger.info("Rows copied: {}", queryProgress.getReadRows());
-            return true;
-        });
+            return my2ch.run(queryProgress ->
+            {
+                logger.info("Rows copied: {}", queryProgress.getReadRows());
+                return true;
+            });
+        }
     }
 }

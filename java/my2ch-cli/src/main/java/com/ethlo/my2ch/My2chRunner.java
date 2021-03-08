@@ -1,5 +1,6 @@
 package com.ethlo.my2ch;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
@@ -10,7 +11,14 @@ import picocli.CommandLine;
 @SpringBootApplication
 public class My2chRunner implements CommandLineRunner, ExitCodeGenerator
 {
+    private final TransferCommand transferCommand;
+
     private int exitCode;
+
+    public My2chRunner(final TransferCommand transferCommand)
+    {
+        this.transferCommand = transferCommand;
+    }
 
     public static void main(String[] args)
     {
@@ -21,7 +29,7 @@ public class My2chRunner implements CommandLineRunner, ExitCodeGenerator
     @Override
     public void run(String... args)
     {
-        exitCode = new CommandLine(new TransferCommand()).execute(args);
+        exitCode = new CommandLine(transferCommand).execute(args);
     }
 
     @Override

@@ -52,6 +52,6 @@ public class SmokeTest
             return true;
         });
         logger.info("Transferred: {}", transferred);
-        logger.info("Table stats: {}", my2ch.getStats(config));
+        logger.info("Table stats: {}", my2ch.getStats());
     }
 }

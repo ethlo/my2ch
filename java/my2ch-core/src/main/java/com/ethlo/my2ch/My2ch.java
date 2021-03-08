@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-import javax.sql.DataSource;
 import javax.validation.Valid;
 
 import org.slf4j.Logger;
@@ -49,20 +48,21 @@ import com.ethlo.my2ch.config.Source;
 import com.ethlo.my2ch.config.Target;
 import com.ethlo.my2ch.config.TransferConfig;
 
-public class My2ch
+public class My2ch implements AutoCloseable
 {
     private static final String statsQueryTemplate = IOUtil.readClasspath("stats_query.sql");
     private static final Logger logger = LoggerFactory.getLogger(My2ch.class);
     private final NamedParameterJdbcTemplate tpl;
     private final ClackShack clackShack;
     private final TransferConfig config;
+    private final SingleConnectionDataSource dataSource;
 
     public My2ch(@Valid final TransferConfig config)
     {
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
         final String url = "jdbc:mysql://" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDb() + "?useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true";
         logger.info("Connecting to {}", url);
-        final DataSource dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
+        this.dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
         final ClickHouseConfig chCfg = config.getTarget().getClickhouse();
@@ -216,7 +216,7 @@ public class My2ch
         }
     }
 
-    public Map<String, Object> getStats(final TransferConfig config)
+    public Map<String, Object> getStats()
     {
         final ResultSet result = fetchStorageStats(config.getTarget().getClickhouse().getDb(), config.getAlias());
         return !result.isEmpty() ? result.asMap().iterator().next() : Collections.emptyMap();
@@ -250,5 +250,11 @@ public class My2ch
     public TransferConfig getConfig()
     {
         return config;
+    }
+
+    @Override
+    public void close()
+    {
+        this.dataSource.destroy();
     }
 }
