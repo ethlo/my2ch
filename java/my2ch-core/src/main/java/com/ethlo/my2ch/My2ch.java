@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.validation.Valid;
 
@@ -33,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 import com.ethlo.clackshack.ClackShack;
@@ -70,7 +73,7 @@ public class My2ch implements AutoCloseable
         this.config = config;
     }
 
-    public String convertMysqlToClickhouseType(final String mysqlType)
+    public static String convertMysqlToClickhouseType(final String mysqlType)
     {
         final String lower = mysqlType.toLowerCase();
         final boolean isUnsigned = lower.contains("unsigned");
@@ -104,6 +107,16 @@ public class My2ch implements AutoCloseable
         {
             return prependUnsigned(isUnsigned, DataTypes.DATE_TIME.getName());
         }
+        else if (lower.contains("decimal"))
+        {
+            final Pattern pattern = Pattern.compile("([0-9]+)");
+            final Matcher matcher = pattern.matcher(lower);
+            Assert.isTrue(matcher.find(), "Should have number of digits: " + lower);
+            final int p = Integer.parseInt(matcher.group(1));
+            Assert.isTrue(matcher.find(), "Should have numbers of fraction digits: " + lower);
+            final int s = Integer.parseInt(matcher.group(1));
+            return DataTypes.DECIMAL.getName() + "(" + p + "," + s + ")";
+        }
         else if (lower.contains("date"))
         {
             return prependUnsigned(isUnsigned, DataTypes.DATE.getName());
@@ -116,7 +129,7 @@ public class My2ch implements AutoCloseable
         return DataTypes.STRING.getName();
     }
 
-    private String prependUnsigned(final boolean isUnsigned, final String type)
+    private static String prependUnsigned(final boolean isUnsigned, final String type)
     {
         return isUnsigned ? "U" + type : type;
     }
