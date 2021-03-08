@@ -235,7 +235,7 @@ public class My2ch implements AutoCloseable
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
 
         final String createMysqlEngine = "CREATE DATABASE IF NOT EXISTS mysql_"
-                + mysqlDbName + " ENGINE = MySQL(" + mysqlConfig.getHost() + ", '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
+                + mysqlDbName + " ENGINE = MySQL('" + mysqlConfig.getHost() + "', '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
         logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
         clackShack.ddl(createMysqlEngine).join();
 
