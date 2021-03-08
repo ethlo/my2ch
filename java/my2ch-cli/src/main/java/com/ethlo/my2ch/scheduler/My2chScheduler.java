@@ -2,6 +2,7 @@ package com.ethlo.my2ch.scheduler;
 
 import java.text.NumberFormat;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -24,9 +25,8 @@ public class My2chScheduler implements TaskStatusListener
 {
     private static final Logger logger = LoggerFactory.getLogger(My2chScheduler.class);
     private final ThreadPoolTaskScheduler taskScheduler;
-    private Map<String, TransferConfig> tasks = new ConcurrentHashMap<>();
-    private Map<String, TransferStatistics> lastSuccess = new ConcurrentHashMap<>();
-
+    private final Map<String, TransferConfig> tasks = new ConcurrentHashMap<>();
+    private final Map<String, TransferStatistics> lastSuccess = new ConcurrentHashMap<>();
 
     public My2chScheduler(final int poolSize)
     {
@@ -47,19 +47,28 @@ public class My2chScheduler implements TaskStatusListener
             nf.setMaximumFractionDigits(2);
 
             logger.info("Running task {}", task.getConfig().getAlias());
-            final long started = System.nanoTime();
-            final long rowCount = task.run(progress ->
+            try
             {
-                logger.info("Copy in progress: {}", nf.format(progress.getReadRows()));
-                return true;
-            });
-            final long elapsed = System.nanoTime() - started;
+                final OffsetDateTime started = OffsetDateTime.now();
+                final long rowCount = task.run(progress ->
+                {
+                    logger.info("Copy in progress: {}", nf.format(progress.getReadRows()));
+                    return true;
+                });
+                final Duration elapsed = Duration.between(started, OffsetDateTime.now());
 
-            final Map<String, Object> stats = task.getStats();
-            final double rowsPerSec = rowCount / (elapsed / 1_000_000_000D);
-            logger.info("Completed task {}. {} new rows in {} ({}/sec). {} total rows. Last modified {}",
-                    task.getConfig().getAlias(), nf.format(rowCount), Duration.ofNanos(elapsed), nf.format(rowsPerSec), nf.format(stats.get("rows")), stats.get("last_modified")
-            );
+                final TransferStatistics stats = new TransferStatistics(rowCount, started, elapsed, task.getStats());
+                logger.info("Completed task {}. {} new rows in {} ({}/sec). {} total rows. Last modified {}",
+                        task.getConfig().getAlias(), nf.format(rowCount), elapsed, nf.format(stats.getRowsPerSecond()), nf.format(stats.getTableStatistics().get("rows")), stats.getTableStatistics().get("last_modified")
+                );
+
+                finishedSuccess(task.getConfig().getAlias(), stats);
+            }
+            catch (Exception exc)
+            {
+                logger.error(exc.getMessage(), exc);
+                finishedError(task.getConfig().getAlias(), exc);
+            }
         }, interval);
     }
 
@@ -84,16 +93,9 @@ public class My2chScheduler implements TaskStatusListener
         final List<Map<String, Object>> result = new LinkedList<>();
         for (String alias : tasks.keySet())
         {
-            Map<String, Object> stats = null;
-            try (final My2ch task = new My2ch(tasks.get(alias)))
-            {
-                stats = task.getStats();
-            }
-
             final Map<String, Object> data = new LinkedHashMap<>();
             data.put("alias", alias);
             data.put("last_run", lastSuccess.get(alias));
-            data.put("table_statistics", stats);
             result.add(data);
         }
         return result;
