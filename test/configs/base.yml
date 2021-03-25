@@ -1,0 +1,12 @@
+source:
+  mysql:
+    username: root
+    password: example
+    db: employees
+    host: mysql-server
+    port: 3306
+
+target:
+  clickhouse:
+    host: clickhouse-server
+    db: default

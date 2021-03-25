@@ -1,5 +1,4 @@
 #!/bin/bash
 set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-mkdir -p "$DIR/logs"
-docker run --name my2ch --rm --network=db-network -v"$DIR/logs":/logs -v"$DIR/configs":/configs --network=test_db-network -e TZ=UTC ethlocom/my2ch:latest --home=/ "$@"
+docker run --name my2ch --rm --network="db-network" -v"$DIR/configs":/data ethlocom/my2ch:0.1.0-SNAPSHOT --home=/data

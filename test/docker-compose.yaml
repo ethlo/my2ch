@@ -3,8 +3,10 @@ services:
   mysql-server:
     networks:
       - db-network
-    image: mysql:8.0.22
+    image: mysql:5.7
     restart: unless-stopped
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: example
 
@@ -17,6 +19,13 @@ services:
       nofile:
         soft: 262144
         hard: 262144
-
+  my2ch:
+    networks:
+      - db-network
+    image: ethlocom/my2ch:0.1.0-SNAPSHOT
+    command: --home=/data
+    volumes:
+      - "./configs:/data"
 networks:
   db-network:
+    external: true

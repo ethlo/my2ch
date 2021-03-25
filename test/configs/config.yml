@@ -1,9 +1,0 @@
-mysql:
-  user: root
-  pass: example
-  db: employees
-  host: mysql-server
-
-clickhouse:
-  url: clickhouse://clickhouse-server
-  db: default
