@@ -40,26 +40,23 @@ docker run -it --rm --link clickhouse-server:clickhouse-server yandex/clickhouse
 #### Configuration
 Create a folder called `configs` and put the following `employees.yaml` inside it, taking care to change the actual property values to match your setup. 
 ```yaml
-mysql:
-  user: myuser
-  pass: mypass
-  db: employees
-  host: 192.168.50.112
+alias: employees
 
-clickhouse:
-  url: clickhouse://192.168.50.112
-  db: default
-  table_name: employees
-  engine_definition: ENGINE = MergeTree
-    ORDER BY from_date
-    SETTINGS index_granularity = 8192;
+target:
+  primary-key: from_date
+  table-name: employees
+  engine-definition: ENGINE = MergeTree
+      ORDER BY from_date
+      SETTINGS index_granularity = 8192;
 
-transfer:
-  primary_key: from_date
-  range_clause: and from_date > '{max_primary_key}'
+source:
+  range-clause: where from_date > '{max_primary_key}'
   query: select e.emp_no, birth_date, s.from_date, s.to_date, s.salary
     from salaries s
     left join employees e on s.emp_no = e.emp_no
+
+schedule:
+  interval: PT30s
 ```
 
 For reference, the data model in MySQL has the following structure:
