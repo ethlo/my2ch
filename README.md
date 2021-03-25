@@ -60,7 +60,7 @@ schedule:
 ```
 
 For reference, the data model in MySQL has the following structure:
-![Schema](test/doc/schema.png)
+![Schema](doc/schema.png)
 
 #### Transfer data
 Run the following command to transfer data:
