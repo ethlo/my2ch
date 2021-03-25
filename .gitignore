@@ -1,6 +1,6 @@
 *.iml
 /java/target
-test/tmp
+integration-test/tmp
 logs/*
 .idea
 
