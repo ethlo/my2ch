@@ -11,7 +11,5 @@ fi
 tar xzf "$FILENAME"
 cd test_db
 
-mysql -h127.0.0.1 -uroot -pexample < employees.sql
-
-#echo 'Importing'
-#docker run --rm --network="db-network" imega/mysql-client mysql:10.5.6 --host=mysql-server --user=root --password=example
+echo 'Importing into MySQL'
+docker run -it --network=db-network --rm -v$PWD:/docker-entrypoint-initdb.d mysql mysql -hmysql-server -uroot -pexample
