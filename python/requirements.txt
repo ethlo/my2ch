@@ -1,9 +1,0 @@
-mysql-connector-python~=8.0.22
-clickhouse-driver~=0.2.0
-humanize~=3.2.0
-schedule~=0.6.0
-sqlparse~=0.4.1
-mysql~=0.0.2
-HiYaPyCo~=0.4.16
-schedule~=0.6.0
-isodate~=0.6.0
