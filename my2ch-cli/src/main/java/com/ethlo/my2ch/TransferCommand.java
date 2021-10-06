@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.ethlo.my2ch.config.LifeCycle;
 import com.ethlo.my2ch.config.TransferConfig;
 import com.ethlo.my2ch.scheduler.My2chScheduler;
 import picocli.CommandLine;
@@ -18,7 +19,9 @@ import picocli.CommandLine;
 public class TransferCommand implements Callable<Long>
 {
     private static final Logger logger = LoggerFactory.getLogger(TransferCommand.class);
+
     private final My2chScheduler scheduler;
+    private final DdlManager ddlManager;
 
     @CommandLine.Option(names = "--names", description = "The name of config(s) to run. Undefined runs all")
     private List<String> names;
@@ -29,9 +32,10 @@ public class TransferCommand implements Callable<Long>
     @CommandLine.Option(names = "--service", description = "Run as background-service")
     private Boolean service;
 
-    public TransferCommand(My2chScheduler scheduler)
+    public TransferCommand(My2chScheduler scheduler, final DdlManager ddlManager)
     {
         this.scheduler = scheduler;
+        this.ddlManager = ddlManager;
     }
 
     public Long call() throws InterruptedException
@@ -39,11 +43,17 @@ public class TransferCommand implements Callable<Long>
         final boolean schedule = service != null && service;
 
         final List<String> aliases = (names != null && !names.isEmpty()) ? names : My2chConfigLoader.getConfigs(home);
+        logger.info("Found {} source definitions in {}", aliases.size(), home);
         long total = 0;
         for (String alias : aliases)
         {
-            final TransferConfig config = My2chConfigLoader.loadConfig(home, alias);
+            ddlManager.run(home, alias, LifeCycle.BEFORE);
+
+            final TransferConfig config = My2chConfigLoader.loadConfig(home, alias, TransferConfig.class);
             total += processSingle(config);
+
+            ddlManager.run(home, alias, LifeCycle.AFTER);
+
             if (schedule)
             {
                 scheduler.runAtInterval(config);

@@ -68,8 +68,13 @@ public class My2ch implements AutoCloseable
         this.dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
+        logger.info("Connected to MySQL");
+
         final ClickHouseConfig chCfg = config.getTarget().getClickhouse();
         this.clackShack = new ClackShackImpl("http://" + chCfg.getHost() + ":" + chCfg.getPort());
+        this.clackShack.query("SELECT 1").join();
+        logger.info("Connected to ClickHouse");
+
         this.config = config;
     }
 
@@ -245,12 +250,15 @@ public class My2ch implements AutoCloseable
 
         final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
 
+        logger.info("Connecting to source {}", config.getSource().getMysql());
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
 
         final String createMysqlEngine = "CREATE DATABASE IF NOT EXISTS mysql_"
-                + mysqlDbName + " ENGINE = MySQL('" + mysqlConfig.getHost() + "', '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
+                + mysqlDbName + " ENGINE = MySQL('" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "', '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
         logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
+
         clackShack.ddl(createMysqlEngine).join();
+        logger.info("MySQL database connection created from ClickHouse to MySQL");
 
         final String viewName = setupView(config, isIncremental, tableExists);
 

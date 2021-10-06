@@ -1,9 +1,12 @@
 package com.ethlo.my2ch;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -28,17 +31,22 @@ import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.util.StringUtils;
 
-import com.ethlo.my2ch.config.TransferConfig;
+import com.ethlo.my2ch.config.DDL;
 
 public class My2chConfigLoader
 {
     private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
-    public static TransferConfig loadConfig(final Path baseDir, final String alias)
+    public static <T> T loadConfig(final Path baseDir, final String alias, final Class<T> type)
+    {
+        return loadConfig(baseDir.resolve(alias + ".yml"), type);
+    }
+
+    public static <T> T loadConfig(final Path path, final Class<T> type)
     {
         try
         {
-            return doLoadConfig(baseDir, alias);
+            return doLoadConfig(path, type);
         }
         catch (IOException e)
         {
@@ -46,12 +54,10 @@ public class My2chConfigLoader
         }
     }
 
-    private static TransferConfig doLoadConfig(final Path baseDir, final String alias) throws IOException
+    private static <T> T doLoadConfig(final Path path, Class<T> type) throws IOException
     {
-        final FileSystemResource baseConfigResource = new FileSystemResource(baseDir.resolve("base.yml"));
-        final FileSystemResource ymlConfigResource = new FileSystemResource(baseDir.resolve(alias + ".yml"));
-        final FileSystemResource yamlConfigResource = new FileSystemResource(baseDir.resolve(alias + ".yaml"));
-        final FileSystemResource configResource = ymlConfigResource.exists() ? ymlConfigResource : yamlConfigResource;
+        final FileSystemResource baseConfigResource = new FileSystemResource(path.getParent().resolve("base.yml"));
+        final FileSystemResource configResource = new FileSystemResource(path);
 
         final List<PropertySource<?>> propertySources = new LinkedList<>();
 
@@ -60,7 +66,7 @@ public class My2chConfigLoader
         propertySources.add(new SystemEnvironmentPropertySource("env", env));
 
         // Config file
-        propertySources.addAll(new YamlPropertySourceLoader().load(alias, configResource));
+        propertySources.addAll(new YamlPropertySourceLoader().load(path.getParent().getFileName().toString(), configResource));
 
         // Base config file
         if (baseConfigResource.exists())
@@ -85,10 +91,10 @@ public class My2chConfigLoader
             return null;
         };
         final Binder binder = new Binder(s);
-        final TransferConfig config = binder.bind(ConfigurationPropertyName.of(""), Bindable.of(TransferConfig.class), new BindHandler()
+        final T config = binder.bind(ConfigurationPropertyName.of(""), Bindable.of(type), new BindHandler()
         {
         }).get();
-        final Set<ConstraintViolation<TransferConfig>> violations = validator.validate(config);
+        final Set<ConstraintViolation<T>> violations = validator.validate(config);
         if (!violations.isEmpty())
         {
             throw new IllegalArgumentException("Error loading " + configResource.getURI()
@@ -96,13 +102,6 @@ public class My2chConfigLoader
         }
 
         return config;
-    }
-
-    public static List<TransferConfig> loadConfigs(final Path basePath)
-    {
-        return getConfigFiles(basePath).stream().map(configFile ->
-                My2chConfigLoader.loadConfig(basePath, getBaseName(configFile.getFileName().toString())))
-                .collect(Collectors.toList());
     }
 
     private static String getBaseName(final String filename)
@@ -128,7 +127,7 @@ public class My2chConfigLoader
                     .filter(p ->
                     {
                         final String filename = p.getFileName().toString();
-                        return (filename.endsWith(".yml") || filename.endsWith(".yaml")) && !getBaseName(filename).equals("base");
+                        return filename.endsWith(".yml") && !getBaseName(filename).equals("base");
                     })
                     .collect(Collectors.toList());
         }
@@ -136,5 +135,34 @@ public class My2chConfigLoader
         {
             throw new UncheckedIOException(e);
         }
+    }
+
+    public static List<DDL> getDDLs(final Path ddlPath)
+    {
+        try (final Stream<Path> st = Files.list(ddlPath))
+        {
+            return new ArrayList<>(st
+                    .filter(p ->
+                    {
+                        final String filename = p.getFileName().toString();
+                        return filename.endsWith(".yml");
+                    })
+                    .map(p -> My2chConfigLoader.loadConfig(p, DDL.class))
+                    .collect(Collectors.toMap(DDL::getVersion, c -> c))
+                    .values());
+        }
+        catch (FileNotFoundException ignored)
+        {
+            return Collections.emptyList();
+        }
+        catch (IOException e)
+        {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static String extractVersion(String fileName)
+    {
+        return null;
     }
 }

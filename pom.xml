@@ -28,7 +28,7 @@
             <dependency>
                 <groupId>com.ethlo.clackshack</groupId>
                 <artifactId>clackshack</artifactId>
-                <version>1.0.0</version>
+                <version>1.0.1-SNAPSHOT</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

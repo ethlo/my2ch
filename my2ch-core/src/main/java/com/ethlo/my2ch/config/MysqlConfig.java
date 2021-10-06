@@ -74,4 +74,29 @@ public class MysqlConfig
     {
         return db;
     }
+
+    @Override
+    public String toString()
+    {
+        return "MysqlConfig{" +
+                "host='" + host + '\'' +
+                ", port=" + port +
+                ", username='" + username + '\'' +
+                ", password='" + redactPassword(password) + '\'' +
+                ", db='" + db + '\'' +
+                '}';
+    }
+
+    private static String redactPassword(final String password)
+    {
+        if (password == null)
+        {
+            return null;
+        }
+        else if (password.length() <= 2)
+        {
+            return "*****";
+        }
+        return password.charAt(0) + "******" + password.charAt(password.length() - 1);
+    }
 }

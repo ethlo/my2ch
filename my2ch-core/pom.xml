@@ -45,6 +45,11 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.ethlo.time</groupId>
+            <artifactId>chronograph</artifactId>
+            <version>1.2.0</version>
+        </dependency>
 
         <!-- TEST -->
         <dependency>
