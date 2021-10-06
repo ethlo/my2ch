@@ -1,3 +1,4 @@
+*.versionsBackup
 *.iml
 /java/target
 integration-test/tmp
