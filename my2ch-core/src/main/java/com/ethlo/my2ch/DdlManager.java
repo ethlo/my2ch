@@ -6,5 +6,5 @@ import java.nio.file.Path;
 
 public interface DdlManager
 {
-    void run(final Path home, String alias, LifeCycle lifeCycle);
+    void run(final Path dir, LifeCycle lifeCycle);
 }

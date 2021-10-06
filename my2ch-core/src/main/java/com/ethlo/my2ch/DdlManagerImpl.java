@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import com.ethlo.clackshack.ClackShack;
 import com.ethlo.clackshack.ClackShackImpl;
 import com.ethlo.clackshack.model.ResultSet;
+import com.ethlo.clackshack.model.Row;
 import com.ethlo.my2ch.config.ClickHouseConfig;
 import com.ethlo.my2ch.config.Ddl;
 import com.ethlo.my2ch.config.LifeCycle;
@@ -31,15 +33,17 @@ public class DdlManagerImpl implements DdlManager
     public static final String MIGRATIONS_PATH_NAME = "migrations";
 
     @Override
-    public void run(final Path home, final String alias, LifeCycle lifeCycle)
+    public void run(final Path dir, final LifeCycle lifeCycle)
     {
-        final Path migrationsForAliasPath = home.resolve(DdlManagerImpl.MIGRATIONS_PATH_NAME).resolve(alias);
+        final Path migrationsForAliasPath = dir.resolve(DdlManagerImpl.MIGRATIONS_PATH_NAME);
         if (!Files.exists(migrationsForAliasPath))
         {
             return;
         }
+        final String alias = My2chConfigLoader.getAlias(dir);
         logger.info("Looking for migrations related to alias {} in path {}", alias, migrationsForAliasPath);
-        final TransferConfig config = My2chConfigLoader.loadConfig(home, alias, TransferConfig.class);
+        final TransferConfig config = My2chConfigLoader.loadConfig(dir.resolve("transfer.yml"), TransferConfig.class);
+
         final List<Ddl> ddls = My2chConfigLoader.getDDLs(migrationsForAliasPath);
         final ClickHouseConfig clickhouseCfg = config.getTarget().getClickhouse();
         final ClackShack clackShack = new ClackShackImpl("http://" + clickhouseCfg.getHost() + ":" + clickhouseCfg.getPort());
@@ -47,7 +51,7 @@ public class DdlManagerImpl implements DdlManager
         {
             if (ddl.getLifecycle() == lifeCycle)
             {
-                runQuery(clackShack, "CREATE TABLE IF NOT EXISTS my2ch_migrations (alias String, version String, timestamp DateTime, lifecycle Enum('before'=1, 'after'=2), result Enum('success'=1, 'failure'=2), elapsed String, checksum String) " +
+                runQuery(clackShack, "CREATE TABLE IF NOT EXISTS my2ch_migrations (alias String, version String, timestamp DateTime64(3), lifecycle Enum('before'=1, 'after'=2), status Enum('start'=0, 'success'=1, 'failure'=2), elapsed String, checksum String) " +
                         "ENGINE = MergeTree " +
                         "ORDER BY (alias, version)");
 
@@ -55,27 +59,33 @@ public class DdlManagerImpl implements DdlManager
                 params.put("alias", alias);
                 params.put("version", ddl.getVersion());
                 params.put("lifecycle", ddl.getLifecycle().name().toLowerCase());
-                params.put("result", "failure");
-                params.put("timestamp", LocalDateTime.now());
+                params.put("status", "start");
+                params.put("elapsed", "0");
+                params.put("timestamp", nowDateString());
                 params.put("checksum", checksum(ddl.getQuery()));
-
-                // TODO: Consider failing if already run and failure
-
-                // TODO: Consider using hash of DDL query to detect changes in definitions files VS what has been applied
 
                 if (checkNotRunOrSuccessful(clackShack, params))
                 {
-                    logMigrationFailure(clackShack, params);
+                    logMigration(clackShack, params);
                     final Chronograph chronograph = Chronograph.create();
                     chronograph.start("ddl");
                     logger.info("Running DDL with version {} for alias {} at lifecycle {}", ddl.getVersion(), alias, ddl.getLifecycle());
+
                     runQuery(clackShack, ddl.getQuery());
                     chronograph.stop();
+
+                    params.put("status", "success");
+                    params.put("timestamp", nowDateString());
                     params.put("elapsed", chronograph.getTotalTime().toString());
-                    logMigrationSuccess(clackShack, params);
+                    logMigration(clackShack, params);
                 }
             }
         }
+    }
+
+    private String nowDateString()
+    {
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
     }
 
     private void runQuery(ClackShack clackShack, String s)
@@ -93,27 +103,26 @@ public class DdlManagerImpl implements DdlManager
 
     private boolean checkNotRunOrSuccessful(final ClackShack clackShack, Map<String, Object> params)
     {
-        final ResultSet result = clackShack.query("SELECT * FROM my2ch_migrations WHERE alias = :alias AND version = :version", params).join();
+        final ResultSet result = clackShack.query("SELECT * FROM my2ch_migrations WHERE alias = :alias AND version = :version order by timestamp DESC", params).join();
         if (result.isEmpty())
         {
             return true;
         }
 
-        final boolean wasSuccessful = "success".equals(result.getRow(0).get("result"));
+        final Row row = result.getRow(0);
+        final boolean wasSuccessful = "success".equals(row.get("status"));
         if (!wasSuccessful)
         {
             throw new IllegalStateException(String.format("Found a failed migration for %s, version %s", params.get("alias"), params.get("version")));
         }
-        return true;
+
+        // TODO: Check checksum match!
+
+        return false;
     }
 
-    private void logMigrationSuccess(final ClackShack clackShack, final Map<String, Object> params)
+    private void logMigration(ClackShack clackShack, Map<String, Object> params)
     {
-        clackShack.insert("ALTER TABLE my2ch_migrations UPDATE result = 'success' WHERE alias = :alias AND version = :version", params).join();
-    }
-
-    private void logMigrationFailure(ClackShack clackShack, Map<String, Object> params)
-    {
-        clackShack.insert("INSERT INTO my2ch_migrations VALUES (:alias, :version, :timestamp, :lifecycle, :result, :elapsed, :checksum)", params).join();
+        clackShack.insert("INSERT INTO my2ch_migrations VALUES (:alias, :version, :timestamp, :lifecycle, :status, :elapsed, :checksum)", params).join();
     }
 }

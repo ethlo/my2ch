@@ -44,7 +44,7 @@ public class SmokeTest
     {
         final Path baseDir = Paths.get("/home/morten/dev/ethlo/my2ch/java/my2ch-cli/src/test/resources/samples");
         final String alias = "foo1";
-        final TransferConfig config = My2chConfigLoader.loadConfig(baseDir, alias, TransferConfig.class);
+        final TransferConfig config = My2chConfigLoader.loadConfig(baseDir.resolve(alias), TransferConfig.class);
         final My2ch my2ch = new My2ch(config);
         final long transferred = my2ch.run(queryProgress ->
         {

@@ -1,5 +1,6 @@
 package com.ethlo.my2ch;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -42,21 +43,26 @@ public class TransferCommand implements Callable<Long>
     {
         final boolean schedule = service != null && service;
 
-        final List<String> aliases = (names != null && !names.isEmpty()) ? names : My2chConfigLoader.getConfigs(home);
-        logger.info("Found {} source definitions in {}", aliases.size(), home);
+        final List<Path> directories = My2chConfigLoader.getConfigDirectories(home, names);
+        logger.info("Found {} definitions in {}", directories.size(), home);
         long total = 0;
-        for (String alias : aliases)
+        for (final Path directory : directories)
         {
-            ddlManager.run(home, alias, LifeCycle.BEFORE);
+            final Path transferFile = directory.resolve("transfer.yml");
 
-            final TransferConfig config = My2chConfigLoader.loadConfig(home, alias, TransferConfig.class);
-            total += processSingle(config);
-
-            ddlManager.run(home, alias, LifeCycle.AFTER);
-
-            if (schedule)
+            if (Files.exists(transferFile) && Files.isRegularFile(transferFile))
             {
-                scheduler.runAtInterval(config);
+                ddlManager.run(directory, LifeCycle.BEFORE);
+
+                final TransferConfig config = My2chConfigLoader.loadConfig(transferFile, TransferConfig.class);
+                total += processSingle(config);
+
+                ddlManager.run(directory, LifeCycle.AFTER);
+
+                if (schedule)
+                {
+                    scheduler.runAtInterval(config);
+                }
             }
         }
 

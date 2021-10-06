@@ -262,8 +262,14 @@ public class My2ch implements AutoCloseable
 
         final String viewName = setupView(config, isIncremental, tableExists);
 
+        logger.info("Starting transfer from MySQL view {} to ClickHouse table {}", viewName, config.getAlias());
         final long transferred = transferData("SELECT * FROM mysql_" + mysqlDbName + "." + viewName, target.getClickhouse().getDb(), config.getAlias(), progressListener);
+
+        logger.info("Dropping view {} in MySQL", viewName);
         dropView(viewName);
+
+        logger.info("Dropping MySQL database engine created from ClickHouse to MySQL");
+        clackShack.ddl("DROP DATABASE IF EXISTS mysql_" + mysqlDbName).join();
 
         return transferred;
     }

@@ -18,6 +18,8 @@ import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
 import javax.validation.Validator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.bind.BindHandler;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -35,12 +37,9 @@ import com.ethlo.my2ch.config.Ddl;
 
 public class My2chConfigLoader
 {
-    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+    private static final Logger logger = LoggerFactory.getLogger(My2chConfigLoader.class);
 
-    public static <T> T loadConfig(final Path baseDir, final String alias, final Class<T> type)
-    {
-        return loadConfig(baseDir.resolve(alias + ".yml"), type);
-    }
+    private static final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     public static <T> T loadConfig(final Path path, final Class<T> type)
     {
@@ -56,7 +55,7 @@ public class My2chConfigLoader
 
     private static <T> T doLoadConfig(final Path path, Class<T> type) throws IOException
     {
-        final FileSystemResource baseConfigResource = new FileSystemResource(path.getParent().resolve("base.yml"));
+        final FileSystemResource baseConfigResource = new FileSystemResource(path.getParent().getParent().resolve("_transfer.yml"));
         final FileSystemResource configResource = new FileSystemResource(path);
 
         final List<PropertySource<?>> propertySources = new LinkedList<>();
@@ -71,7 +70,8 @@ public class My2chConfigLoader
         // Base config file
         if (baseConfigResource.exists())
         {
-            propertySources.addAll(new YamlPropertySourceLoader().load("base", baseConfigResource));
+            logger.debug("Using {} as fallback for {}", baseConfigResource.getFile().getAbsolutePath(), path);
+            propertySources.addAll(new YamlPropertySourceLoader().load("transfer.yml", baseConfigResource));
         }
 
         final ConfigurationPropertySource s = name ->
@@ -114,21 +114,23 @@ public class My2chConfigLoader
         return filename;
     }
 
-    public static List<String> getConfigs(final Path basePath)
-    {
-        return getConfigFiles(basePath).stream().map(p -> getBaseName(p.getFileName().toString())).collect(Collectors.toList());
-    }
-
-    private static List<Path> getConfigFiles(final Path basePath)
+    public static List<Path> getConfigDirectories(final Path basePath, final List<String> includes)
     {
         try (final Stream<Path> st = Files.list(basePath))
         {
             return st
-                    .filter(p ->
-                    {
-                        final String filename = p.getFileName().toString();
-                        return filename.endsWith(".yml") && !getBaseName(filename).equals("base");
+                    .filter(Files::isDirectory)
+                    .filter(p -> {
+                        try
+                        {
+                            return !Files.isHidden(p);
+                        }
+                        catch (IOException e)
+                        {
+                            throw new UncheckedIOException(e);
+                        }
                     })
+                    .filter(p -> includes == null || includes.contains(p.getFileName().toString()))
                     .collect(Collectors.toList());
         }
         catch (IOException e)
@@ -164,5 +166,10 @@ public class My2chConfigLoader
     private static String extractVersion(String fileName)
     {
         return null;
+    }
+
+    public static String getAlias(Path dir)
+    {
+        return dir.getFileName().toString();
     }
 }
