@@ -31,7 +31,7 @@ import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.util.StringUtils;
 
-import com.ethlo.my2ch.config.DDL;
+import com.ethlo.my2ch.config.Ddl;
 
 public class My2chConfigLoader
 {
@@ -137,7 +137,7 @@ public class My2chConfigLoader
         }
     }
 
-    public static List<DDL> getDDLs(final Path ddlPath)
+    public static List<Ddl> getDDLs(final Path ddlPath)
     {
         try (final Stream<Path> st = Files.list(ddlPath))
         {
@@ -147,8 +147,8 @@ public class My2chConfigLoader
                         final String filename = p.getFileName().toString();
                         return filename.endsWith(".yml");
                     })
-                    .map(p -> My2chConfigLoader.loadConfig(p, DDL.class))
-                    .collect(Collectors.toMap(DDL::getVersion, c -> c))
+                    .map(p -> My2chConfigLoader.loadConfig(p, Ddl.class))
+                    .collect(Collectors.toMap(Ddl::getVersion, c -> c))
                     .values());
         }
         catch (FileNotFoundException ignored)

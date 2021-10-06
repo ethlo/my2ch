@@ -18,7 +18,7 @@ import com.ethlo.clackshack.ClackShack;
 import com.ethlo.clackshack.ClackShackImpl;
 import com.ethlo.clackshack.model.ResultSet;
 import com.ethlo.my2ch.config.ClickHouseConfig;
-import com.ethlo.my2ch.config.DDL;
+import com.ethlo.my2ch.config.Ddl;
 import com.ethlo.my2ch.config.LifeCycle;
 import com.ethlo.my2ch.config.TransferConfig;
 import com.ethlo.time.Chronograph;
@@ -40,10 +40,10 @@ public class DdlManagerImpl implements DdlManager
         }
         logger.info("Looking for migrations related to alias {} in path {}", alias, migrationsForAliasPath);
         final TransferConfig config = My2chConfigLoader.loadConfig(home, alias, TransferConfig.class);
-        final List<DDL> ddls = My2chConfigLoader.getDDLs(migrationsForAliasPath);
+        final List<Ddl> ddls = My2chConfigLoader.getDDLs(migrationsForAliasPath);
         final ClickHouseConfig clickhouseCfg = config.getTarget().getClickhouse();
         final ClackShack clackShack = new ClackShackImpl("http://" + clickhouseCfg.getHost() + ":" + clickhouseCfg.getPort());
-        for (final DDL ddl : ddls)
+        for (final Ddl ddl : ddls)
         {
             if (ddl.getLifecycle() == lifeCycle)
             {

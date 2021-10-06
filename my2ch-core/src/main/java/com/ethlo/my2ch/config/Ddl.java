@@ -5,7 +5,7 @@ import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 @Valid
-public class DDL
+public class Ddl
 {
     @NotEmpty
     private final String version;
@@ -16,7 +16,7 @@ public class DDL
     @NotNull
     private final LifeCycle lifecycle;
 
-    public DDL(final String version, final String query, final LifeCycle lifecycle)
+    public Ddl(final String version, final String query, final LifeCycle lifecycle)
     {
         this.version = version;
         this.query = query;
@@ -41,7 +41,7 @@ public class DDL
     @Override
     public String toString()
     {
-        return "DDL {" +
+        return "Ddl {" +
                 "version='" + version + '\'' +
                 ", lifecycle=" + lifecycle +
                 '}';
