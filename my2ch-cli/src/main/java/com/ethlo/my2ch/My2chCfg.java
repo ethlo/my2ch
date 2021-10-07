@@ -3,14 +3,14 @@ package com.ethlo.my2ch;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.ethlo.my2ch.scheduler.My2chScheduler;
+import com.ethlo.my2ch.scheduler.My2chTaskRunner;
 
 @Configuration
 public class My2chCfg
 {
     @Bean
-    public My2chScheduler scheduler()
+    public My2chTaskRunner scheduler()
     {
-        return new My2chScheduler(1);
+        return new My2chTaskRunner(1);
     }
 }

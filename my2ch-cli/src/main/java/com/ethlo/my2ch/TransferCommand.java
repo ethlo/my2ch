@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.ethlo.my2ch.config.LifeCycle;
 import com.ethlo.my2ch.config.TransferConfig;
-import com.ethlo.my2ch.scheduler.My2chScheduler;
+import com.ethlo.my2ch.scheduler.My2chTaskRunner;
 import picocli.CommandLine;
 
 @Component
@@ -21,7 +21,7 @@ public class TransferCommand implements Callable<Long>
 {
     private static final Logger logger = LoggerFactory.getLogger(TransferCommand.class);
 
-    private final My2chScheduler scheduler;
+    private final My2chTaskRunner taskRunner;
     private final DdlManager ddlManager;
 
     @CommandLine.Option(names = "--names", description = "The name of config(s) to run. Undefined runs all")
@@ -33,9 +33,9 @@ public class TransferCommand implements Callable<Long>
     @CommandLine.Option(names = "--service", description = "Run as background-service")
     private Boolean service;
 
-    public TransferCommand(My2chScheduler scheduler, final DdlManager ddlManager)
+    public TransferCommand(My2chTaskRunner taskRunner, final DdlManager ddlManager)
     {
-        this.scheduler = scheduler;
+        this.taskRunner = taskRunner;
         this.ddlManager = ddlManager;
     }
 
@@ -44,8 +44,9 @@ public class TransferCommand implements Callable<Long>
         final boolean schedule = service != null && service;
 
         final List<Path> directories = My2chConfigLoader.getConfigDirectories(home, names);
-        logger.info("Found {} definitions in {}", directories.size(), home);
+        logger.info("Found {} definition tasks in {}", directories.size(), home);
         long total = 0;
+        int count = 0;
         for (final Path directory : directories)
         {
             final Path transferFile = directory.resolve("transfer.yml");
@@ -55,18 +56,19 @@ public class TransferCommand implements Callable<Long>
                 ddlManager.run(directory, LifeCycle.BEFORE);
 
                 final TransferConfig config = My2chConfigLoader.loadConfig(transferFile, TransferConfig.class);
-                total += processSingle(config);
+                total += taskRunner.runTask(new My2ch(config)).getRows();
 
                 ddlManager.run(directory, LifeCycle.AFTER);
 
                 if (schedule)
                 {
-                    scheduler.runAtInterval(config);
+                    taskRunner.runAtInterval(config);
                 }
+                count++;
             }
         }
 
-        logger.info("Completed with a total of {} copied rows", total);
+        logger.info("Completed {} tasks with a total of {} copied rows", count, format(total));
 
         if (schedule)
         {
@@ -77,16 +79,8 @@ public class TransferCommand implements Callable<Long>
         return total;
     }
 
-    private long processSingle(final TransferConfig config)
+    private String format(long l)
     {
-        logger.info("Processing {}", config.getAlias());
-        try (final My2ch my2ch = new My2ch(config))
-        {
-            return my2ch.run(queryProgress ->
-            {
-                logger.info("Rows copied: {}", queryProgress.getReadRows());
-                return true;
-            });
-        }
+        return String.format("%,d", l);
     }
 }

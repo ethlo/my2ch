@@ -40,7 +40,7 @@ public class DdlManagerImpl implements DdlManager
             return;
         }
         final String alias = My2chConfigLoader.getAlias(dir);
-        logger.info("Looking for migrations related to alias {} in path {}", alias, migrationsForAliasPath);
+        logger.debug("Looking for migrations related to alias {} in path {}", alias, migrationsForAliasPath);
         final TransferConfig config = My2chConfigLoader.loadConfig(dir.resolve("transfer.yml"), TransferConfig.class);
 
         final List<Ddl> ddls = My2chConfigLoader.getDDLs(migrationsForAliasPath);

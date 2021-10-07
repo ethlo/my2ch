@@ -21,14 +21,14 @@ import com.ethlo.my2ch.TransferStatistics;
 import com.ethlo.my2ch.config.Schedule;
 import com.ethlo.my2ch.config.TransferConfig;
 
-public class My2chScheduler implements TaskStatusListener
+public class My2chTaskRunner implements TaskStatusListener
 {
-    private static final Logger logger = LoggerFactory.getLogger(My2chScheduler.class);
+    private static final Logger logger = LoggerFactory.getLogger(My2chTaskRunner.class);
     private final ThreadPoolTaskScheduler taskScheduler;
     private final Map<String, TransferConfig> tasks = new ConcurrentHashMap<>();
     private final Map<String, TransferStatistics> lastSuccess = new ConcurrentHashMap<>();
 
-    public My2chScheduler(final int poolSize)
+    public My2chTaskRunner(final int poolSize)
     {
         this.taskScheduler = new TaskSchedulerBuilder()
                 .threadNamePrefix("my2ch-")
@@ -42,27 +42,9 @@ public class My2chScheduler implements TaskStatusListener
         this.tasks.put(task.getConfig().getAlias(), task.getConfig());
         taskScheduler.scheduleWithFixedDelay(() ->
         {
-            final NumberFormat nf = NumberFormat.getInstance(Locale.getDefault());
-            nf.setGroupingUsed(true);
-            nf.setMaximumFractionDigits(2);
-
-            logger.info("Running task {}", task.getConfig().getAlias());
             try
             {
-                final OffsetDateTime started = OffsetDateTime.now();
-                final long rowCount = task.run(progress ->
-                {
-                    logger.info("Copy in progress: {}", nf.format(progress.getReadRows()));
-                    return true;
-                });
-                final Duration elapsed = Duration.between(started, OffsetDateTime.now());
-
-                final TransferStatistics stats = new TransferStatistics(rowCount, started, elapsed, task.getStats());
-                logger.info("Completed task {}. {} new rows in {} ({}/sec). {} total rows. Last modified {}",
-                        task.getConfig().getAlias(), nf.format(rowCount), elapsed, nf.format(stats.getRowsPerSecond()), nf.format(stats.getTableStatistics().get("rows")), stats.getTableStatistics().get("last_modified")
-                );
-
-                finishedSuccess(task.getConfig().getAlias(), stats);
+                runTask(task);
             }
             catch (Exception exc)
             {
@@ -70,6 +52,31 @@ public class My2chScheduler implements TaskStatusListener
                 finishedError(task.getConfig().getAlias(), exc);
             }
         }, interval);
+    }
+
+    public TransferStatistics runTask(My2ch task)
+    {
+        final NumberFormat nf = NumberFormat.getInstance(Locale.getDefault());
+        nf.setGroupingUsed(true);
+        nf.setMaximumFractionDigits(2);
+
+        logger.info("Task {} - Starting", task.getConfig().getAlias());
+        final OffsetDateTime started = OffsetDateTime.now();
+        final long rowCount = task.run(progress ->
+        {
+            logger.info("Task {} - Progress {}", task.getConfig().getAlias(), nf.format(progress.getReadRows()));
+            return true;
+        });
+        final Duration elapsed = Duration.between(started, OffsetDateTime.now());
+
+        final TransferStatistics stats = new TransferStatistics(rowCount, started, elapsed, task.getStats());
+        logger.info("Task {} - Completed with {} new rows in {} ({}/sec). {} total rows. Last modified {}",
+                task.getConfig().getAlias(), nf.format(rowCount), elapsed, nf.format(stats.getRowsPerSecond()), nf.format(stats.getTableStatistics().get("rows")), stats.getTableStatistics().get("last_modified")
+        );
+
+        finishedSuccess(task.getConfig().getAlias(), stats);
+
+        return stats;
     }
 
     public void runAtInterval(final TransferConfig config)

@@ -2,20 +2,19 @@
 Transfer a MySQL query result to a Clickhouse table with potential incremental updates.
 
 ## What is it?
-A simple command line tool that allows you to define a MySQL query that is created as a table in ClickHouse for further analysis of the data. Schedule it to have daily updates or every minute to near realtime data.
+A tool that allows you to define a MySQL query that is created as a table in ClickHouse for further analysis of the data. Schedule it to have daily updates or every minute to near realtime data.
 
 ## Why?
 MySQL is a popular OLTP database, but it is not the best when it comes to analysis and statistics. Clickhouse is fantastic when it comes to richness  of query functions and raw speed of both queries and insert rate, which makes it a great match.
 
 ## How does it work?
-
-* Create a MySQL temp table from query
-* Translate the table to ClickHouse format
+This tool will automatically:
+* Create a MySQL temporary table from query
+* Describe the temp table to create a ClickHouse table representation
 * Create a view in MySQL with the query
-* Create a table in Clickhouse with the definition
-* Create a MYSQL-engine database in ClickHouse
+* Create a table in Clickhouse based on the definition 
+* Create a MYSQL-engine database in ClickHouse to connect directly to MySQL
 * INSERT INTO SELECT from the view to the ClickHouse table
-
 ## Example
 
 #### Prerequisites: 
@@ -36,9 +35,8 @@ You can connect with the native ClickHouse client using th following command:
 docker run -it --rm --link clickhouse-server:clickhouse-server yandex/clickhouse-client --host clickhouse-server
 ```
 
-
 #### Configuration
-Create a folder called `configs` and put the following `employees.yaml` inside it, taking care to change the actual property values to match your setup. 
+Create a folder called `configs/employees` and put the following `transfer.yaml` inside it, taking care to change the actual property values to match your setup. 
 ```yaml
 alias: employees
 

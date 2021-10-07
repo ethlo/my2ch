@@ -39,7 +39,7 @@ public class TransferStatistics
     @JsonProperty("rows_per_second")
     public double getRowsPerSecond()
     {
-        return rows / ((double) elapsed.toNanos() / 1_000_000);
+        return rows / (((double) elapsed.toNanos()) / 1_000_000_000);
     }
 
     @JsonProperty("table_stats")

@@ -64,14 +64,14 @@ public class My2ch implements AutoCloseable
     {
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
         final String mysqlUrl = mysqlConfig.getUrl();
-        logger.info("Connecting to MySQL using {}", mysqlUrl);
+        logger.debug("Connecting to MySQL using {}", mysqlUrl);
         this.dataSource = new SingleConnectionDataSource(mysqlUrl, true);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
         logger.debug("Connected to MySQL");
 
         final ClickHouseConfig chCfg = config.getTarget().getClickhouse();
-        logger.info("Connecting to ClickHouse using URL {}", chCfg.getUrl());
+        logger.debug("Connecting to ClickHouse using URL {}", chCfg.getUrl());
         this.clackShack = new ClackShackImpl(chCfg.getUrl());
         this.clackShack.query("SELECT 1").join();
         logger.debug("Connected to ClickHouse");
@@ -251,7 +251,7 @@ public class My2ch implements AutoCloseable
 
         final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
 
-        logger.info("Connecting to source {}", config.getSource().getMysql());
+        logger.debug("Connecting to source {}", config.getSource().getMysql());
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
 
         final String createMysqlEngine = "CREATE DATABASE IF NOT EXISTS mysql_"
@@ -259,17 +259,17 @@ public class My2ch implements AutoCloseable
         logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
 
         clackShack.ddl(createMysqlEngine).join();
-        logger.info("MySQL database connection created from ClickHouse to MySQL");
+        logger.debug("MySQL database connection created from ClickHouse to MySQL");
 
         final String viewName = setupView(config, isIncremental, tableExists);
 
-        logger.info("Starting transfer from MySQL view {} to ClickHouse table {}", viewName, config.getAlias());
+        logger.debug("Starting transfer from MySQL view {} to ClickHouse table {}", viewName, config.getAlias());
         final long transferred = transferData("SELECT * FROM mysql_" + mysqlDbName + "." + viewName, target.getClickhouse().getDb(), config.getAlias(), progressListener);
 
-        logger.info("Dropping view {} in MySQL", viewName);
+        logger.debug("Dropping view {} in MySQL", viewName);
         dropView(viewName);
 
-        logger.info("Dropping MySQL database engine created from ClickHouse to MySQL");
+        logger.debug("Dropping MySQL database engine created from ClickHouse to MySQL");
         clackShack.ddl("DROP DATABASE IF EXISTS mysql_" + mysqlDbName).join();
 
         return transferred;
