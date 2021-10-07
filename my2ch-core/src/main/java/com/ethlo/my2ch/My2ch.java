@@ -63,17 +63,18 @@ public class My2ch implements AutoCloseable
     public My2ch(@Valid final TransferConfig config)
     {
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
-        final String url = "jdbc:mysql://" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDb() + "?useUnicode=yes&characterEncoding=UTF-8&rewriteBatchedStatements=true";
-        logger.info("Connecting to {}", url);
-        this.dataSource = new SingleConnectionDataSource(url, mysqlConfig.getUsername(), mysqlConfig.getPassword(), true);
+        final String mysqlUrl = mysqlConfig.getUrl();
+        logger.info("Connecting to MySQL using {}", mysqlUrl);
+        this.dataSource = new SingleConnectionDataSource(mysqlUrl, true);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
-        logger.info("Connected to MySQL");
+        logger.debug("Connected to MySQL");
 
         final ClickHouseConfig chCfg = config.getTarget().getClickhouse();
-        this.clackShack = new ClackShackImpl("http://" + chCfg.getHost() + ":" + chCfg.getPort());
+        logger.info("Connecting to ClickHouse using URL {}", chCfg.getUrl());
+        this.clackShack = new ClackShackImpl(chCfg.getUrl());
         this.clackShack.query("SELECT 1").join();
-        logger.info("Connected to ClickHouse");
+        logger.debug("Connected to ClickHouse");
 
         this.config = config;
     }

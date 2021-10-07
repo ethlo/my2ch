@@ -20,6 +20,8 @@ package com.ethlo.my2ch.config;
  * #L%
  */
 
+import java.net.URI;
+
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
@@ -27,32 +29,41 @@ import javax.validation.constraints.NotNull;
 public class MysqlConfig
 {
     @NotNull
+    private final String url;
+
+    private final String username;
+    private final String password;
+    private final int port;
     private final String host;
 
-    @NotNull
-    private final int port;
-
-    @NotNull
-    private final String username;
-
-    @NotNull
-    private final String password;
-
-    @NotNull
-    private final String db;
-
-    public MysqlConfig(final String host, final int port, final String username, final String password, final String db)
+    public MysqlConfig(final String url)
     {
-        this.host = host;
-        this.port = port;
-        this.username = username;
-        this.password = password;
-        this.db = db;
+        this.url = url;
+
+        final URI uri = URI.create(URI.create(url).getSchemeSpecificPart());
+        this.host = uri.getHost();
+
+        final String[] userInfo = uri.getUserInfo().split(":");
+        this.username = userInfo[0];
+        this.password = userInfo[1];
+
+        this.port = uri.getPort() != 0 ? uri.getPort() : 3306;
     }
 
-    public String getHost()
+    public String getUrl()
     {
-        return host;
+        return url;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "MysqlConfig {url=" + url + "}";
+    }
+
+    public int getPort()
+    {
+        return port;
     }
 
     public String getUsername()
@@ -65,38 +76,8 @@ public class MysqlConfig
         return password;
     }
 
-    public int getPort()
+    public String getHost()
     {
-        return port;
-    }
-
-    public String getDb()
-    {
-        return db;
-    }
-
-    @Override
-    public String toString()
-    {
-        return "MysqlConfig{" +
-                "host='" + host + '\'' +
-                ", port=" + port +
-                ", username='" + username + '\'' +
-                ", password='" + redactPassword(password) + '\'' +
-                ", db='" + db + '\'' +
-                '}';
-    }
-
-    private static String redactPassword(final String password)
-    {
-        if (password == null)
-        {
-            return null;
-        }
-        else if (password.length() <= 2)
-        {
-            return "*****";
-        }
-        return password.charAt(0) + "******" + password.charAt(password.length() - 1);
+        return host;
     }
 }

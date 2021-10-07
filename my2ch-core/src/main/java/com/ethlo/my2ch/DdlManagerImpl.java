@@ -28,9 +28,8 @@ import com.ethlo.time.Chronograph;
 @Service
 public class DdlManagerImpl implements DdlManager
 {
-    private static final Logger logger = LoggerFactory.getLogger(DdlManagerImpl.class);
-
     public static final String MIGRATIONS_PATH_NAME = "migrations";
+    private static final Logger logger = LoggerFactory.getLogger(DdlManagerImpl.class);
 
     @Override
     public void run(final Path dir, final LifeCycle lifeCycle)
@@ -46,7 +45,7 @@ public class DdlManagerImpl implements DdlManager
 
         final List<Ddl> ddls = My2chConfigLoader.getDDLs(migrationsForAliasPath);
         final ClickHouseConfig clickhouseCfg = config.getTarget().getClickhouse();
-        final ClackShack clackShack = new ClackShackImpl("http://" + clickhouseCfg.getHost() + ":" + clickhouseCfg.getPort());
+        final ClackShack clackShack = new ClackShackImpl(clickhouseCfg.getUrl());
         for (final Ddl ddl : ddls)
         {
             if (ddl.getLifecycle() == lifeCycle)
