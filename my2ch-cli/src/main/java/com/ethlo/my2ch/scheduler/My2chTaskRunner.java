@@ -56,27 +56,44 @@ public class My2chTaskRunner implements TaskStatusListener
 
     public TransferStatistics runTask(My2ch task)
     {
-        final NumberFormat nf = NumberFormat.getInstance(Locale.getDefault());
-        nf.setGroupingUsed(true);
-        nf.setMaximumFractionDigits(2);
-
         logger.info("Task {} - Starting", task.getConfig().getAlias());
         final OffsetDateTime started = OffsetDateTime.now();
         final long rowCount = task.run(progress ->
         {
-            logger.info("Task {} - Progress {}", task.getConfig().getAlias(), nf.format(progress.getReadRows()));
+            logger.info("Task {} - Progress {}", task.getConfig().getAlias(), format(progress.getReadRows()));
             return true;
         });
         final Duration elapsed = Duration.between(started, OffsetDateTime.now());
 
         final TransferStatistics stats = new TransferStatistics(rowCount, started, elapsed, task.getStats());
         logger.info("Task {} - Completed with {} new rows in {} ({}/sec). {} total rows. Last modified {}",
-                task.getConfig().getAlias(), nf.format(rowCount), elapsed, nf.format(stats.getRowsPerSecond()), nf.format(stats.getTableStatistics().get("rows")), stats.getTableStatistics().get("last_modified")
+                task.getConfig().getAlias(), format(rowCount), elapsed, format(stats.getRowsPerSecond()), format(stats.getTableStatistics().get("rows")), stats.getTableStatistics().get("last_modified")
         );
 
         finishedSuccess(task.getConfig().getAlias(), stats);
 
         return stats;
+    }
+
+    private String format(Object obj)
+    {
+        if (obj == null)
+        {
+            return null;
+        }
+
+        final NumberFormat nf = NumberFormat.getInstance(Locale.getDefault());
+        nf.setGroupingUsed(true);
+        nf.setMaximumFractionDigits(2);
+        try
+        {
+            return nf.format(obj);
+        }
+        catch (IllegalArgumentException exc)
+        {
+            logger.info("Unable to format {}", obj, exc);
+            return "0";
+        }
     }
 
     public void runAtInterval(final TransferConfig config)

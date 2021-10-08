@@ -269,8 +269,8 @@ public class My2ch implements AutoCloseable
         logger.debug("Dropping view {} in MySQL", viewName);
         dropView(viewName);
 
-        logger.debug("Dropping MySQL database engine created from ClickHouse to MySQL");
-        clackShack.ddl("DROP DATABASE IF EXISTS mysql_" + mysqlDbName).join();
+        // logger.debug("Dropping MySQL database engine created from ClickHouse to MySQL");
+        //clackShack.ddl("DROP DATABASE IF EXISTS mysql_" + mysqlDbName).join();
 
         return transferred;
     }

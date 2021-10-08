@@ -3,6 +3,7 @@ package com.ethlo.my2ch;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -30,7 +31,10 @@ import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.origin.PropertySourceOrigin;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.util.PropertyPlaceholderHelper;
 import org.springframework.util.StringUtils;
 
 import com.ethlo.my2ch.config.Ddl;
@@ -61,17 +65,19 @@ public class My2chConfigLoader
         final List<PropertySource<?>> propertySources = new LinkedList<>();
 
         // System environment
-        final Map env = System.getenv();
-        propertySources.add(new SystemEnvironmentPropertySource("env", env));
+        final Map<String, String> env = System.getenv();
+        propertySources.add(new SystemEnvironmentPropertySource("env", (Map) env));
 
         // Config file
-        propertySources.addAll(new YamlPropertySourceLoader().load(path.getParent().getFileName().toString(), configResource));
+        final String configName = path.getParent().getFileName().toString();
+        propertySources.addAll(new YamlPropertySourceLoader().load(configName, replaceEnv(configResource, env)));
 
         // Base config file
         if (baseConfigResource.exists())
         {
-            logger.debug("Using {} as fallback for {}", baseConfigResource.getFile().getAbsolutePath(), path);
-            propertySources.addAll(new YamlPropertySourceLoader().load("transfer.yml", baseConfigResource));
+            final String baseName = baseConfigResource.getFile().getAbsolutePath();
+            logger.debug("Using {} as fallback for {}", baseName, path);
+            propertySources.addAll(new YamlPropertySourceLoader().load(baseName, replaceEnv(baseConfigResource, env)));
         }
 
         final ConfigurationPropertySource s = name ->
@@ -102,6 +108,20 @@ public class My2chConfigLoader
         }
 
         return config;
+    }
+
+    private static Resource replaceEnv(final Resource resource, final Map<String, String> env)
+    {
+        try
+        {
+            final String raw = Files.readString(resource.getFile().toPath());
+            final String replaced = new PropertyPlaceholderHelper("{{", "}}").replacePlaceholders(raw, env::get);
+            return new ByteArrayResource(replaced.getBytes(StandardCharsets.UTF_8), resource.getDescription());
+        }
+        catch (IOException exc)
+        {
+            throw new UncheckedIOException(exc);
+        }
     }
 
     private static String getBaseName(final String filename)

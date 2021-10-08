@@ -43,9 +43,18 @@ public class MysqlConfig
         final URI uri = URI.create(URI.create(url).getSchemeSpecificPart());
         this.host = uri.getHost();
 
-        final String[] userInfo = uri.getUserInfo().split(":");
-        this.username = userInfo[0];
-        this.password = userInfo[1];
+
+        if (uri.getUserInfo() != null)
+        {
+            final String[] userInfo = uri.getUserInfo().split(":");
+            this.username = userInfo[0];
+            this.password = userInfo[1];
+        }
+        else
+        {
+            this.username = null;
+            this.password = null;
+        }
 
         this.port = uri.getPort() != 0 ? uri.getPort() : 3306;
     }
