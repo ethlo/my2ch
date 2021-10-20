@@ -115,7 +115,7 @@ public class My2chConfigLoader
         try
         {
             final String raw = Files.readString(resource.getFile().toPath());
-            final String replaced = new PropertyPlaceholderHelper("{{", "}}").replacePlaceholders(raw, env::get);
+            final String replaced = new PropertyPlaceholderHelper("{{", "}}", null, false).replacePlaceholders(raw, env::get);
             return new ByteArrayResource(replaced.getBytes(StandardCharsets.UTF_8), resource.getDescription());
         }
         catch (IOException exc)
