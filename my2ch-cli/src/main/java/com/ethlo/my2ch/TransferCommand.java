@@ -44,7 +44,7 @@ public class TransferCommand implements Callable<Long>
         final boolean schedule = service != null && service;
 
         final List<Path> directories = My2chConfigLoader.getConfigDirectories(home, names);
-        logger.info("Found {} definition tasks in {}", directories.size(), home);
+        logger.info("Found {} tasks in {}", directories.size(), home);
         long total = 0;
         int count = 0;
         for (final Path directory : directories)

@@ -2,6 +2,6 @@ management:
   endpoints:
     web:
       exposure:
-        include: 'health,info,metrics,transfers'
+        include: 'health,info,metrics,transfers,clickhouse'
 server:
   port: 17773

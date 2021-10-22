@@ -56,7 +56,7 @@ public class MysqlConfig
             this.password = null;
         }
 
-        this.port = uri.getPort() != 0 ? uri.getPort() : 3306;
+        this.port = uri.getPort() > 0 ? uri.getPort() : 3306;
     }
 
     public String getUrl()

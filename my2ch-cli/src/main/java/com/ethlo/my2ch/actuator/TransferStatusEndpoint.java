@@ -1,4 +1,4 @@
-package com.ethlo.my2ch;
+package com.ethlo.my2ch.actuator;
 
 import java.util.List;
 import java.util.Map;

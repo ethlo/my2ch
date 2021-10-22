@@ -136,4 +136,14 @@ public class My2chTaskRunner implements TaskStatusListener
     {
 
     }
+
+    public Optional<TransferConfig> getTask(String name)
+    {
+        return Optional.ofNullable(tasks.get(name));
+    }
+
+    public Map<String, TransferConfig> getTasks()
+    {
+        return tasks;
+    }
 }
