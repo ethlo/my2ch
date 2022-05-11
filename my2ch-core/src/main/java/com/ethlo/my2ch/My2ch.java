@@ -20,6 +20,7 @@ package com.ethlo.my2ch;
  * #L%
  */
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,7 +35,6 @@ import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -50,6 +50,8 @@ import com.ethlo.my2ch.config.MysqlConfig;
 import com.ethlo.my2ch.config.Source;
 import com.ethlo.my2ch.config.Target;
 import com.ethlo.my2ch.config.TransferConfig;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 public class My2ch implements AutoCloseable
 {
@@ -58,14 +60,22 @@ public class My2ch implements AutoCloseable
     private final NamedParameterJdbcTemplate tpl;
     private final ClackShack clackShack;
     private final TransferConfig config;
-    private final SingleConnectionDataSource dataSource;
+    private final HikariDataSource dataSource;
 
     public My2ch(@Valid final TransferConfig config)
     {
         final MysqlConfig mysqlConfig = config.getSource().getMysql();
         final String mysqlUrl = mysqlConfig.getUrl();
         logger.debug("Connecting to MySQL using {}", mysqlUrl);
-        this.dataSource = new SingleConnectionDataSource(mysqlUrl, true);
+        final HikariConfig hikariConfig = new HikariConfig();
+        hikariConfig.setJdbcUrl(mysqlUrl);
+        hikariConfig.setUsername(mysqlConfig.getUsername());
+        hikariConfig.setPassword(mysqlConfig.getPassword());
+        hikariConfig.setKeepaliveTime(Duration.ofMinutes(1).toMillis());
+        hikariConfig.setMaximumPoolSize(1);
+        hikariConfig.setLeakDetectionThreshold(Duration.ofMinutes(30).toMillis());
+
+        this.dataSource = new HikariDataSource(hikariConfig);
         this.tpl = new NamedParameterJdbcTemplate(dataSource);
         tpl.queryForObject("SELECT 1", Collections.emptyMap(), Long.class);
         logger.debug("Connected to MySQL");
@@ -283,6 +293,6 @@ public class My2ch implements AutoCloseable
     @Override
     public void close()
     {
-        this.dataSource.destroy();
+        this.dataSource.close();
     }
 }
