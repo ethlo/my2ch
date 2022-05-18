@@ -235,12 +235,16 @@ public class My2ch implements AutoCloseable
         }
         else
         {
-            final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getClickhouse().getDb(), config.getAlias());
+            final String tmpTableName = "tmp_" + config.getAlias() + "_" + System.currentTimeMillis();
+            final String tmpDbAndTable = target.getClickhouse().getDb() + "." + tmpTableName;
+            final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getClickhouse().getDb(), tmpDbAndTable);
             logger.debug("Clickhouse table definition: {}", tableDef);
 
-            clackShack.ddl("DROP TABLE IF EXISTS " + targetDbAndTable);
             logger.debug("Creating clickhouse table {}", config.getAlias());
             clackShack.ddl(tableDef).join();
+
+            clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + tmpDbAndTable);
+
             return createView(config.getAlias(), source.getQuery(), null);
         }
     }
