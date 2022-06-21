@@ -155,18 +155,16 @@ public class My2ch implements AutoCloseable
         return isNullable ? "Nullable(" + param + ")" : param;
     }
 
-    private String getClickHouseTableDefinition(final String query, final String engineDefinition, final String clickHouseTargetDb, final String clickHouseTargetTableName)
+    private String getClickHouseTableDefinition(final String tmpTableName, final String query, final String engineDefinition, final String clickHouseTmpDbAndTable)
     {
-        final String tmpName = "my2ch_" + clickHouseTargetTableName;
+        tpl.update("DROP TABLE IF EXISTS " + tmpTableName, Collections.emptyMap());
 
-        tpl.update("DROP TABLE IF EXISTS " + tmpName, Collections.emptyMap());
-
-        tpl.update("CREATE TEMPORARY TABLE `" + tmpName + "` AS " + query + " LIMIT 0", Collections.emptyMap());
+        tpl.update("CREATE TEMPORARY TABLE `" + tmpTableName + "` AS " + query + " LIMIT 0", Collections.emptyMap());
 
         final StringBuilder s = new StringBuilder();
-        s.append("CREATE TABLE ").append(clickHouseTargetDb).append(".").append(clickHouseTargetTableName).append(" (");
+        s.append("CREATE TABLE ").append(clickHouseTmpDbAndTable).append(" (");
         final List<String> columns = new LinkedList<>();
-        tpl.query("DESC " + tmpName, row ->
+        tpl.query("DESC " + tmpTableName, row ->
         {
             final String columnName = row.getString(1);
             final String mysqlType = row.getString(2);
@@ -235,15 +233,17 @@ public class My2ch implements AutoCloseable
         }
         else
         {
-            final String tmpTableName = "tmp_" + config.getAlias() + "_" + System.currentTimeMillis();
-            final String tmpDbAndTable = target.getClickhouse().getDb() + "." + tmpTableName;
-            final String tableDef = getClickHouseTableDefinition(source.getQuery(), target.getEngineDefinition(), target.getClickhouse().getDb(), tmpDbAndTable);
+            final String tmpTableName = "tmp_" + config.getAlias();
+            final String clickHouseTmpDbAndTable = target.getClickhouse().getDb() + "." + tmpTableName;
+            clackShack.ddl("DROP TABLE IF EXISTS " + clickHouseTmpDbAndTable);
+
+            final String tableDef = getClickHouseTableDefinition(tmpTableName, source.getQuery(), target.getEngineDefinition(), clickHouseTmpDbAndTable);
             logger.debug("Clickhouse table definition: {}", tableDef);
 
             logger.debug("Creating clickhouse table {}", config.getAlias());
             clackShack.ddl(tableDef).join();
 
-            clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + tmpDbAndTable);
+            clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + clickHouseTmpDbAndTable);
 
             return createView(config.getAlias(), source.getQuery(), null);
         }

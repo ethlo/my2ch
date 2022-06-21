@@ -5,9 +5,11 @@ import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+
 import picocli.CommandLine;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = DataSourceAutoConfiguration.class)
 public class My2chRunner implements CommandLineRunner, ExitCodeGenerator
 {
     private final TransferCommand transferCommand;
