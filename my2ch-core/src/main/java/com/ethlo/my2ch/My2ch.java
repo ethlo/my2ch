@@ -83,7 +83,7 @@ public class My2ch implements AutoCloseable
         final ClickHouseConfig chCfg = config.getTarget().getClickhouse();
         logger.debug("Connecting to ClickHouse using URL {}", chCfg.getUrl());
         this.clackShack = new ClackShackImpl(chCfg.getUrl());
-        this.clackShack.query("SELECT 1").join();
+        this.clackShack.query("SELECT 1");
         logger.debug("Connected to ClickHouse");
 
         this.config = config;
@@ -184,7 +184,7 @@ public class My2ch implements AutoCloseable
         final String statQuery = statsQueryTemplate
                 .replaceAll("\\{db}", databaseName)
                 .replaceAll("\\{table}", tableName);
-        return clackShack.query(statQuery).join();
+        return clackShack.query(statQuery);
     }
 
     private void dropView(final String viewName)
@@ -210,7 +210,7 @@ public class My2ch implements AutoCloseable
             logger.debug("Progress: {}", queryProgress);
             max.set(queryProgress.getReadRows());
             return listener.apply(queryProgress);
-        })).join();
+        }));
         return max.get();
     }
 
@@ -223,7 +223,7 @@ public class My2ch implements AutoCloseable
         if (isIncremental && tableExists)
         {
             // Find current max
-            final ResultSet maxResult = clackShack.query("SELECT MAX(" + target.getPrimaryKey() + ") FROM " + targetDbAndTable).join();
+            final ResultSet maxResult = clackShack.query("SELECT MAX(" + target.getPrimaryKey() + ") FROM " + targetDbAndTable);
             final long max = maxResult.get(0, 0, Number.class).longValue();
             logger.debug("Current max value of column {} in Clickhouse table '{}': {}", target.getPrimaryKey(), config.getAlias(), max);
 
@@ -241,7 +241,7 @@ public class My2ch implements AutoCloseable
             logger.debug("Clickhouse table definition: {}", tableDef);
 
             logger.debug("Creating clickhouse table {}", config.getAlias());
-            clackShack.ddl(tableDef).join();
+            clackShack.ddl(tableDef);
 
             clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + clickHouseTmpDbAndTable);
 
@@ -260,7 +260,7 @@ public class My2ch implements AutoCloseable
         final Source source = config.getSource();
         final Target target = config.getTarget();
         final boolean isIncremental = source.getRangeClause() != null;
-        final ResultSet result = clackShack.query("EXISTS TABLE " + config.getAlias()).join();
+        final ResultSet result = clackShack.query("EXISTS TABLE " + config.getAlias());
         final boolean tableExists = result.get(0, 0, Number.class).intValue() == 1;
 
         final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
@@ -272,7 +272,7 @@ public class My2ch implements AutoCloseable
                 + mysqlDbName + " ENGINE = MySQL('" + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "', '" + mysqlDbName + "', '" + mysqlConfig.getUsername() + "', '" + mysqlConfig.getPassword() + "')";
         logger.debug("Command to create MySQL DB proxy in Clickhouse: {}", createMysqlEngine);
 
-        clackShack.ddl(createMysqlEngine).join();
+        clackShack.ddl(createMysqlEngine);
         logger.debug("MySQL database connection created from ClickHouse to MySQL");
 
         final String viewName = setupView(config, isIncremental, tableExists);

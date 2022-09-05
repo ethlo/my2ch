@@ -11,7 +11,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.0</version>
+        <version>2.7.2</version>
     </parent>
     <modules>
         <module>my2ch-core</module>
@@ -28,7 +28,7 @@
             <dependency>
                 <groupId>com.ethlo.clackshack</groupId>
                 <artifactId>clackshack</artifactId>
-                <version>1.0.2</version>
+                <version>2.0.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

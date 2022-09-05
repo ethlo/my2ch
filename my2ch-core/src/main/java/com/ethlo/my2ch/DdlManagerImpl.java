@@ -89,8 +89,7 @@ public class DdlManagerImpl implements DdlManager
 
     private void runQuery(ClackShack clackShack, String s)
     {
-        clackShack.ddl(s)
-                .join();
+        clackShack.ddl(s);
     }
 
     private String checksum(String query)
@@ -102,7 +101,7 @@ public class DdlManagerImpl implements DdlManager
 
     private boolean checkNotRunOrSuccessful(final ClackShack clackShack, Map<String, Object> params)
     {
-        final ResultSet result = clackShack.query("SELECT * FROM my2ch_migrations WHERE alias = :alias AND version = :version order by timestamp DESC", params).join();
+        final ResultSet result = clackShack.query("SELECT * FROM my2ch_migrations WHERE alias = :alias AND version = :version order by timestamp DESC", params);
         if (result.isEmpty())
         {
             return true;
@@ -122,6 +121,6 @@ public class DdlManagerImpl implements DdlManager
 
     private void logMigration(ClackShack clackShack, Map<String, Object> params)
     {
-        clackShack.insert("INSERT INTO my2ch_migrations VALUES (:alias, :version, :timestamp, :lifecycle, :status, :elapsed, :checksum)", params).join();
+        clackShack.insert("INSERT INTO my2ch_migrations VALUES (:alias, :version, :timestamp, :lifecycle, :status, :elapsed, :checksum)", params);
     }
 }

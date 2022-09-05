@@ -48,8 +48,7 @@ public class ClickhouseTablesEndpoint
                     "SELECT bytes\n" +
                             "FROM system.parts\n" +
                             "WHERE database = :db " +
-                            "AND table = :table", params)
-                    .join();
+                            "AND table = :table", params);
             final long size = result.isEmpty() ? 0 : result
                     .getRow(0)
                     .get("bytes", Number.class)
