@@ -5,7 +5,7 @@
     <parent>
         <artifactId>my2ch</artifactId>
         <groupId>com.ethlo.my2ch</groupId>
-        <version>1.1.6</version>
+        <version>1.2.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>my2ch-cli</artifactId>
@@ -14,7 +14,7 @@
         <dependency>
             <groupId>com.ethlo.my2ch</groupId>
             <artifactId>my2ch-core</artifactId>
-            <version>1.1.6</version>
+            <version>1.2.0</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
