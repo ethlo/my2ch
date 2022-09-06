@@ -240,10 +240,19 @@ public class My2ch implements AutoCloseable
             final String tableDef = getClickHouseTableDefinition(tmpTableName, source.getQuery(), target.getEngineDefinition(), clickHouseTmpDbAndTable);
             logger.debug("Clickhouse table definition: {}", tableDef);
 
-            logger.debug("Creating clickhouse table {}", config.getAlias());
+            logger.debug("Creating clickhouse table {}", clickHouseTmpDbAndTable);
             clackShack.ddl(tableDef);
 
-            clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + clickHouseTmpDbAndTable);
+            if (clackShack.query("EXISTS TABLE " + targetDbAndTable).get(0, 0, Integer.class) > 0)
+            {
+                // Table exists, so do an atomic exchange
+                clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + clickHouseTmpDbAndTable);
+            }
+            else
+            {
+                // It does not exist, so we simply rename it
+                clackShack.ddl("RENAME TABLE " + clickHouseTmpDbAndTable + " TO " + targetDbAndTable);
+            }
 
             return createView(config.getAlias(), source.getQuery(), null);
         }
