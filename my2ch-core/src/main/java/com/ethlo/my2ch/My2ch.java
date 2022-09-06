@@ -243,7 +243,7 @@ public class My2ch implements AutoCloseable
             logger.debug("Creating clickhouse table {}", clickHouseTmpDbAndTable);
             clackShack.ddl(tableDef);
 
-            if (clackShack.query("EXISTS TABLE " + targetDbAndTable).get(0, 0, Integer.class) > 0)
+            if (clackShack.query("EXISTS TABLE " + targetDbAndTable).get(0, 0, Short.class) > 0)
             {
                 // Table exists, so do an atomic exchange
                 clackShack.ddl("EXCHANGE TABLES " + targetDbAndTable + " AND " + clickHouseTmpDbAndTable);
