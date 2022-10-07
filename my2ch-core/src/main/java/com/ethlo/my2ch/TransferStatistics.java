@@ -20,17 +20,24 @@ package com.ethlo.my2ch;
  * #L%
  */
 
-import com.ethlo.my2ch.scheduler.My2chTaskRunner;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.Map;
 
-@Configuration
-public class My2chCfg
+public record TransferStatistics(long rows, OffsetDateTime started, Duration elapsed,
+                                 Map<String, Object> tableStatistics)
 {
-    @Bean
-    public My2chTaskRunner scheduler()
+    @JsonProperty("rows_per_second")
+    public double getRowsPerSecond()
     {
-        return new My2chTaskRunner(1);
+        return (rows * 1_000_000_000D) / elapsed.toNanos();
+    }
+
+    @JsonProperty("table_stats")
+    public Map<String, Object> getTableStatistics()
+    {
+        return tableStatistics;
     }
 }

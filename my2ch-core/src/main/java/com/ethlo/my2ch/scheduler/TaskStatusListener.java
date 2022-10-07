@@ -1,4 +1,4 @@
-package com.ethlo.my2ch;
+package com.ethlo.my2ch.scheduler;
 
 /*-
  * #%L
@@ -20,17 +20,11 @@ package com.ethlo.my2ch;
  * #L%
  */
 
-import com.ethlo.my2ch.scheduler.My2chTaskRunner;
+import com.ethlo.my2ch.TransferStatistics;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class My2chCfg
+public interface TaskStatusListener
 {
-    @Bean
-    public My2chTaskRunner scheduler()
-    {
-        return new My2chTaskRunner(1);
-    }
+    void finishedSuccess(String task, TransferStatistics transferStatistics);
+
+    void finishedError(String task, Exception exception);
 }
