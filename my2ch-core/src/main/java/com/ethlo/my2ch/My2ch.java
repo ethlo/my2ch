@@ -89,72 +89,6 @@ public class My2ch implements AutoCloseable
         this.config = config;
     }
 
-    public static String convertMysqlToClickhouseType(final String mysqlType)
-    {
-        final String lower = mysqlType.toLowerCase();
-        final boolean isUnsigned = lower.contains("unsigned");
-        switch (lower)
-        {
-            case "tinyint":
-                return prependUnsigned(isUnsigned, DataTypes.INT_8.getName());
-            case "smallint":
-                return prependUnsigned(isUnsigned, DataTypes.INT_16.getName());
-            case "mediumint":
-                return prependUnsigned(isUnsigned, DataTypes.INT_32.getName());
-        }
-
-        if (lower.contains("bigint"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.INT_64.getName());
-        }
-        else if (lower.contains("int"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.INT_32.getName());
-        }
-        else if (lower.contains("float"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.FLOAT_32.getName());
-        }
-        else if (lower.contains("double"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.FLOAT_64.getName());
-        }
-        else if (lower.contains("datetime") || lower.contains("timestamp"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.DATE_TIME.getName());
-        }
-        else if (lower.contains("decimal"))
-        {
-            final Pattern pattern = Pattern.compile("([0-9]+)");
-            final Matcher matcher = pattern.matcher(lower);
-            Assert.isTrue(matcher.find(), "Should have number of digits: " + lower);
-            final int p = Integer.parseInt(matcher.group(1));
-            Assert.isTrue(matcher.find(), "Should have numbers of fraction digits: " + lower);
-            final int s = Integer.parseInt(matcher.group(1));
-            return DataTypes.DECIMAL.getName() + "(" + p + "," + s + ")";
-        }
-        else if (lower.contains("date"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.DATE.getName());
-        }
-        else if (lower.contains("bit") || lower.contains("boolean"))
-        {
-            return prependUnsigned(isUnsigned, DataTypes.UINT_8.getName());
-        }
-
-        return DataTypes.STRING.getName();
-    }
-
-    private static String prependUnsigned(final boolean isUnsigned, final String type)
-    {
-        return isUnsigned ? "U" + type : type;
-    }
-
-    private String nullable(final String param, final boolean isNullable)
-    {
-        return isNullable ? "Nullable(" + param + ")" : param;
-    }
-
     private String getClickHouseTableDefinition(final String tmpTableName, final String query, final String engineDefinition, final String clickHouseTmpDbAndTable)
     {
         tpl.update("DROP TABLE IF EXISTS " + tmpTableName, Collections.emptyMap());
@@ -169,8 +103,8 @@ public class My2ch implements AutoCloseable
             final String columnName = row.getString(1);
             final String mysqlType = row.getString(2);
             final String nullable = row.getString(3);
-            final boolean isNullable = "YES".equals(nullable);
-            final String dataType = nullable(convertMysqlToClickhouseType(mysqlType), isNullable);
+            final boolean isNullable = "YES".equalsIgnoreCase(nullable);
+            final String dataType = ClickHouseTypeDefinitionConverter.fromMysqlType(mysqlType, isNullable);
             columns.add(columnName + " " + dataType);
         });
         s.append(StringUtils.collectionToDelimitedString(columns, ",\n"));
@@ -182,8 +116,8 @@ public class My2ch implements AutoCloseable
     private ResultSet fetchStorageStats(final String databaseName, final String tableName)
     {
         final String statQuery = statsQueryTemplate
-                .replaceAll("\\{db}", databaseName)
-                .replaceAll("\\{table}", tableName);
+                .replace("{db}", databaseName)
+                .replace("{table}", tableName);
         return clackShack.query(statQuery);
     }
 
@@ -228,7 +162,7 @@ public class My2ch implements AutoCloseable
             logger.debug("Current max value of column {} in Clickhouse table '{}': {}", target.getPrimaryKey(), config.getAlias(), max);
 
             final String rangeClauseTpl = config.getSource().getRangeClause();
-            final String rangeClause = rangeClauseTpl != null ? rangeClauseTpl.replaceAll("\\{max_primary_key}", "" + max) : null;
+            final String rangeClause = rangeClauseTpl != null ? rangeClauseTpl.replace("{max_primary_key}", "" + max) : null;
             return createView(config.getAlias(), source.getQuery(), rangeClause);
         }
         else
@@ -268,9 +202,14 @@ public class My2ch implements AutoCloseable
     {
         final Source source = config.getSource();
         final Target target = config.getTarget();
-        final boolean isIncremental = source.getRangeClause() != null;
-        final ResultSet result = clackShack.query("EXISTS TABLE " + config.getAlias());
+        final String qualifiedTargetTableName = config.getTarget().getClickhouse().getDb() + "." + config.getAlias();
+
+        logger.debug("Target table is {}", qualifiedTargetTableName);
+        final ResultSet result = clackShack.query("EXISTS TABLE " + qualifiedTargetTableName);
         final boolean tableExists = result.get(0, 0, Number.class).intValue() == 1;
+
+        final boolean isIncremental = source.getRangeClause() != null;
+        logger.debug("Found range-clause, so is incremental: {}", isIncremental);
 
         final String mysqlDbName = tpl.queryForObject("SELECT DATABASE()", Collections.emptyMap(), String.class);
 
@@ -291,9 +230,6 @@ public class My2ch implements AutoCloseable
 
         logger.debug("Dropping view {} in MySQL", viewName);
         dropView(viewName);
-
-        // logger.debug("Dropping MySQL database engine created from ClickHouse to MySQL");
-        //clackShack.ddl("DROP DATABASE IF EXISTS mysql_" + mysqlDbName).join();
 
         return transferred;
     }

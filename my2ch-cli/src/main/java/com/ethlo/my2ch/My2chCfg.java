@@ -8,7 +8,7 @@ import com.ethlo.my2ch.scheduler.My2chTaskRunner;
 @Configuration
 public class My2chCfg
 {
-    @Bean
+    @Bean(destroyMethod = "shutdown")
     public My2chTaskRunner scheduler()
     {
         return new My2chTaskRunner(1);
