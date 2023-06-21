@@ -6,11 +6,10 @@ import org.junit.jupiter.api.Test;
 
 class My2chTest
 {
-
     @Test
-    void convertMysqlToClickhouseType()
+    void testConvertMysqlToClickhouseType()
     {
-        final String type = My2ch.convertMysqlToClickhouseType("decimal (3, 6 )");
+        final String type = ClickHouseTypeDefinitionConverter.fromMysqlType("decimal (3, 6 )");
         assertThat(type).isEqualTo("Decimal(3,6)");
     }
 }
